@@ -1,5 +1,5 @@
 import api from '@/common/api';
-import type { ApiResponse, Order } from '@/common/types';
+import type { ApiResponse, Order, OrderSource } from '@/common/types';
 
 type QueryParams = Record<string, string | number | undefined>;
 
@@ -9,11 +9,16 @@ export interface CreateOrderItem {
 }
 
 export interface CreateOrderData {
-  customerId: number;
+  renterUserId?: number;
+  renterFullName: string;
+  renterPhoneNumber?: string;
+  renterAddress?: string;
   rentalStartDate: string;
   rentalEndDate: string;
   items: CreateOrderItem[];
   note?: string;
+  source?: OrderSource;
+  pickupDeadlineAt?: string;
 }
 
 export interface ReturnOrderData {
@@ -28,21 +33,27 @@ export interface ReturnOrderData {
 
 export interface OrderFilters {
   status?: string;
-  customerId?: number;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
+  source?: OrderSource;
 }
 
 export const orderApi = {
   getAll: async (filters?: OrderFilters) => {
     const params: QueryParams = {};
     if (filters?.status) params.status = filters.status;
-    if (filters?.customerId) params.customerId = filters.customerId;
     if (filters?.search) params.search = filters.search;
     if (filters?.dateFrom) params.dateFrom = filters.dateFrom;
     if (filters?.dateTo) params.dateTo = filters.dateTo;
+    if (filters?.source) params.source = filters.source;
+
     const response = await api.get<ApiResponse<Order[]>>('/orders', { params });
+    return response.data;
+  },
+
+  getMine: async () => {
+    const response = await api.get<ApiResponse<Order[]>>('/orders/mine');
     return response.data;
   },
 
@@ -57,12 +68,17 @@ export const orderApi = {
   },
 
   confirmPayment: async (id: number) => {
-    const response = await api.put<ApiResponse<Order>>(`/orders/${id}/confirm-payment`);
+    const response = await api.put<ApiResponse<Order>>(
+      `/orders/${id}/confirm-payment`,
+    );
     return response.data;
   },
 
   returnOrder: async (id: number, data: ReturnOrderData) => {
-    const response = await api.put<ApiResponse<Order>>(`/orders/${id}/return`, data);
+    const response = await api.put<ApiResponse<Order>>(
+      `/orders/${id}/return`,
+      data,
+    );
     return response.data;
   },
 

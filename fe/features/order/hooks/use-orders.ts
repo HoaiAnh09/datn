@@ -20,13 +20,20 @@ export function useOrders(filters?: OrderFilters) {
     queryKey: [
       'orders',
       filters?.status,
-      filters?.customerId,
       filters?.search,
       filters?.dateFrom,
       filters?.dateTo,
+      filters?.source,
     ],
     queryFn: () => orderApi.getAll(filters),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useMyOrders() {
+  return useQuery({
+    queryKey: ['orders', 'mine'],
+    queryFn: orderApi.getMine,
   });
 }
 
@@ -43,9 +50,11 @@ export function useCreateOrder() {
 
   return useMutation({
     mutationFn: (data: CreateOrderData) => orderApi.create(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success('Tạo đơn thuê thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi tạo đơn'));
@@ -58,10 +67,12 @@ export function useConfirmPayment() {
 
   return useMutation({
     mutationFn: orderApi.confirmPayment,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order'] });
-      toast.success('Xác nhận thanh toán thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi xác nhận thanh toán'));
@@ -75,10 +86,12 @@ export function useReturnOrder() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: ReturnOrderData }) =>
       orderApi.returnOrder(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order'] });
-      toast.success('Trả đơn thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi trả đơn'));
@@ -91,10 +104,12 @@ export function useCancelOrder() {
 
   return useMutation({
     mutationFn: orderApi.cancel,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order'] });
-      toast.success('Hủy đơn thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi hủy đơn'));

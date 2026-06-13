@@ -10,18 +10,32 @@ import {
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
+import { Role } from '../../common/constants/roles.constant';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { CategoryService } from './category.service';
-import { CreateCategoryDto, UpdateCategoryDto, CategoryQueryDto } from './category.dto';
+import {
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  CategoryQueryDto,
+} from './category.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('categories')
-@UseGuards(JwtAuthGuard)
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
-  create(@Body() dto: CreateCategoryDto) {
-    return this.categoryService.create(dto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async create(@Body() dto: CreateCategoryDto) {
+    const category = await this.categoryService.create(dto);
+
+    return {
+      success: true,
+      message: 'Tạo danh mục thành công',
+      data: category,
+    };
   }
 
   @Get()
@@ -35,15 +49,31 @@ export class CategoryController {
   }
 
   @Put(':id')
-  update(
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDto,
   ) {
-    return this.categoryService.update(id, dto);
+    const category = await this.categoryService.update(id, dto);
+
+    return {
+      success: true,
+      message: 'Cập nhật danh mục thành công',
+      data: category,
+    };
   }
 
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.categoryService.delete(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.categoryService.delete(id);
+
+    return {
+      success: true,
+      message: 'Xóa danh mục thành công',
+      data: result,
+    };
   }
 }

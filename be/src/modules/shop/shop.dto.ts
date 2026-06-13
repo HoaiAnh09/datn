@@ -40,4 +40,12 @@ export class UpdateShopSettingsDto {
   @IsString()
   @IsOptional()
   invoiceFooter?: string;
+
+  @IsString()
+  @IsOptional()
+  heroTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  heroSubtitle?: string;
 }

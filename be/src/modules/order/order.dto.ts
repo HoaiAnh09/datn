@@ -2,12 +2,15 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
+  IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { OrderSource } from './order.entity';
 
 export class CreateOrderItemDto {
   @IsNumber({}, { message: 'Product id must be a number' })
@@ -21,9 +24,22 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @IsNumber({}, { message: 'Customer id must be a number' })
+  @IsNumber({}, { message: 'Renter user id must be a number' })
+  @IsOptional()
   @Type(() => Number)
-  customerId: number;
+  renterUserId?: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Renter full name is required' })
+  renterFullName: string;
+
+  @IsString()
+  @IsOptional()
+  renterPhoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  renterAddress?: string;
 
   @IsDateString({}, { message: 'Rental start date is invalid' })
   rentalStartDate: string;
@@ -39,6 +55,14 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsEnum(OrderSource)
+  @IsOptional()
+  source?: OrderSource;
+
+  @IsDateString({}, { message: 'Pickup deadline is invalid' })
+  @IsOptional()
+  pickupDeadlineAt?: string;
 }
 
 export class ReturnOrderItemDto {
@@ -72,12 +96,6 @@ export class ReturnOrderDto {
   note?: string;
 }
 
-export class PaymentDto {
-  @IsString()
-  @IsOptional()
-  note?: string;
-}
-
 export class OrderQueryDto {
   @IsString()
   @IsOptional()
@@ -87,11 +105,6 @@ export class OrderQueryDto {
   @IsOptional()
   search?: string;
 
-  @IsNumber()
-  @IsOptional()
-  @Type(() => Number)
-  customerId?: number;
-
   @IsDateString({}, { message: 'Date from is invalid' })
   @IsOptional()
   dateFrom?: string;
@@ -99,4 +112,8 @@ export class OrderQueryDto {
   @IsDateString({}, { message: 'Date to is invalid' })
   @IsOptional()
   dateTo?: string;
+
+  @IsEnum(OrderSource)
+  @IsOptional()
+  source?: OrderSource;
 }

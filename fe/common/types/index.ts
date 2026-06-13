@@ -1,23 +1,18 @@
 export interface ApiResponse<T = unknown> {
   success: boolean;
-  message: string;
+  message?: string;
   data?: T;
 }
+
+export type Role = 'OWNER' | 'CUSTOMER';
 
 export interface User {
   id: number;
   username: string;
   fullName: string;
-  role: 'OWNER' | 'STAFF';
-}
-
-export interface Customer {
-  id: number;
-  fullName: string;
-  phoneNumber: string;
-  address?: string;
-  note?: string;
-  createdAt: string;
+  phoneNumber?: string | null;
+  address?: string | null;
+  role: Role;
 }
 
 export interface Product {
@@ -50,6 +45,11 @@ export enum PaymentStatus {
   REFUNDED = 'REFUNDED',
 }
 
+export enum OrderSource {
+  OWNER_DIRECT = 'OWNER_DIRECT',
+  CUSTOMER_REQUEST = 'CUSTOMER_REQUEST',
+}
+
 export interface OrderItem {
   id: number;
   orderId: number;
@@ -61,8 +61,13 @@ export interface OrderItem {
 
 export interface Order {
   id: number;
-  customerId: number;
-  customer: Customer;
+  renterUserId?: number | null;
+  renter?: User | null;
+  renterFullName: string;
+  renterPhoneNumber?: string | null;
+  renterAddress?: string | null;
+  requestId?: number | null;
+  source: OrderSource;
   items: OrderItem[];
   rentalStartDate: string;
   rentalEndDate: string;
@@ -72,7 +77,44 @@ export interface Order {
   refundAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  note?: string;
+  note?: string | null;
+  qrCodeUrl?: string | null;
+  pickupDeadlineAt?: string | null;
+  createdAt: string;
+}
+
+export enum RentalRequestStatus {
+  SUBMITTED = 'SUBMITTED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface RentalRequestItem {
+  id: number;
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  depositAmount: number;
+  product: {
+    id: number;
+    name: string;
+    imageUrl?: string;
+  } | null;
+}
+
+export interface RentalRequest {
+  id: number;
+  userId: number;
+  user: User | null;
+  items: RentalRequestItem[];
+  rentalStartDate: string;
+  rentalEndDate: string;
+  status: RentalRequestStatus;
+  note?: string | null;
+  reviewNote?: string | null;
+  approvedOrderId?: number | null;
+  reviewedAt?: string | null;
   createdAt: string;
 }
 
@@ -88,6 +130,8 @@ export interface ShopSettings {
   bankAccountNumber?: string;
   bankAccountName?: string;
   invoiceFooter?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
 }
 
 export interface Dashboard {
@@ -123,7 +167,7 @@ export interface LowStockProduct {
 
 export interface RecentOrder {
   id: number;
-  customerName: string;
+  renterName: string;
   rentalStartDate: string;
   status: OrderStatus;
 }

@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { Download, ReceiptText } from 'lucide-react';
 import { API_BASE_URL } from '@/common/api';
-import { Order, OrderStatus, PaymentStatus } from '@/common/types';
+import { Order, OrderSource, OrderStatus, PaymentStatus } from '@/common/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,37 +15,39 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrder } from '@/features/order/hooks/use-orders';
 
-function formatCurrency(value: number) {
-  return `${Number(value).toLocaleString('vi-VN')}đ`;
+export function formatCurrency(value: number) {
+  return `${Number(value).toLocaleString('vi-VN')} đ`;
 }
 
-const statusLabels: Record<OrderStatus, string> = {
-  [OrderStatus.PENDING]: 'Chờ thanh toán',
-  [OrderStatus.RENTING]: 'Đang cho thuê',
-  [OrderStatus.RETURNED]: 'Đã trả',
-  [OrderStatus.CANCELLED]: 'Đã hủy',
+export const statusLabels: Record<OrderStatus, string> = {
+  PENDING: 'Chờ thanh toán',
+  RENTING: 'Đang cho thuê',
+  RETURNED: 'Đã trả',
+  CANCELLED: 'Đã hủy',
 };
 
-const paymentLabels: Record<PaymentStatus, string> = {
-  [PaymentStatus.UNPAID]: 'Chưa thanh toán',
-  [PaymentStatus.DEPOSIT_PAID]: 'Đã đặt cọc',
-  [PaymentStatus.REFUNDED]: 'Đã hoàn cọc',
+export const paymentLabels: Record<PaymentStatus, string> = {
+  UNPAID: 'Chưa thanh toán',
+  DEPOSIT_PAID: 'Đã đặt cọc',
+  REFUNDED: 'Đã hoàn cọc',
 };
 
-function OrderDetailContent({ order }: { order: Order }) {
+const sourceLabels: Record<OrderSource, string> = {
+  OWNER_DIRECT: 'Tạo trực tiếp tại quầy',
+  CUSTOMER_REQUEST: 'Duyệt từ yêu cầu online',
+};
+
+export function OrderDetailContent({ order }: { order: Order }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-[1.6rem] border-0 bg-white shadow-[0_12px_32px_rgba(120,134,164,0.12)]">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Khách hàng</p>
-            <p className="mt-2 text-lg font-semibold">{order.customer?.fullName || 'Không rõ'}</p>
-            <Link
-              href={`/customers?search=${encodeURIComponent(order.customer?.phoneNumber || order.customer?.fullName || '')}`}
-              className="mt-3 inline-flex items-center text-sm font-medium text-primary"
-            >
-              Mở khách hàng liên quan
-            </Link>
+            <p className="text-sm text-muted-foreground">Người thuê</p>
+            <p className="mt-2 text-lg font-semibold">{order.renterFullName}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {order.renterPhoneNumber || 'Chưa có số điện thoại'}
+            </p>
           </CardContent>
         </Card>
 
@@ -54,7 +55,9 @@ function OrderDetailContent({ order }: { order: Order }) {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Trạng thái đơn</p>
             <p className="mt-2 text-lg font-semibold">{statusLabels[order.status]}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{paymentLabels[order.paymentStatus]}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {paymentLabels[order.paymentStatus]}
+            </p>
           </CardContent>
         </Card>
 
@@ -62,7 +65,9 @@ function OrderDetailContent({ order }: { order: Order }) {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Tiền thuê</p>
             <p className="mt-2 text-lg font-semibold">{formatCurrency(order.rentalPrice)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Tiền cọc: {formatCurrency(order.depositAmount)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Tiền cọc: {formatCurrency(order.depositAmount)}
+            </p>
           </CardContent>
         </Card>
 
@@ -70,7 +75,9 @@ function OrderDetailContent({ order }: { order: Order }) {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Hoàn cọc</p>
             <p className="mt-2 text-lg font-semibold">{formatCurrency(order.refundAmount || 0)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Tiền phạt: {formatCurrency(order.penaltyAmount || 0)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Phí phạt: {formatCurrency(order.penaltyAmount || 0)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -81,7 +88,7 @@ function OrderDetailContent({ order }: { order: Order }) {
             <div>
               <h3 className="text-lg font-bold">Sản phẩm trong đơn</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Bấm vào từng sản phẩm để mở nhanh trang quản lý tương ứng.
+                Danh sách đồ thuê được chụp lại đúng thời điểm tạo đơn.
               </p>
             </div>
 
@@ -91,25 +98,14 @@ function OrderDetailContent({ order }: { order: Order }) {
                   key={item.id}
                   className="rounded-2xl border border-[var(--page-divider)] bg-white p-4"
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <p className="font-medium">{item.product?.name || `Sản phẩm #${item.productId}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Số lượng: {item.quantity} | Giá/ngày: {formatCurrency(item.unitPrice)}
-                      </p>
-                      {item.product?.damageFee !== undefined && (
-                        <p className="text-sm text-muted-foreground">
-                          Phí hư hỏng chuẩn: {formatCurrency(item.product.damageFee)}
-                        </p>
-                      )}
-                    </div>
-
-                    <Link
-                      href={`/products?search=${encodeURIComponent(item.product?.name || String(item.productId))}`}
-                      className="inline-flex text-sm font-medium text-primary"
-                    >
-                      Mở sản phẩm
-                    </Link>
+                  <div className="space-y-1">
+                    <p className="font-medium">{item.product?.name || `Sản phẩm #${item.productId}`}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Số lượng: {item.quantity} · Giá/ngày: {formatCurrency(item.unitPrice)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Phí hư hỏng chuẩn: {formatCurrency(Number(item.product?.damageFee ?? 0))}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -122,7 +118,7 @@ function OrderDetailContent({ order }: { order: Order }) {
             <div>
               <h3 className="text-lg font-bold">Thông tin đơn</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Mốc thời gian và ghi chú xử lý đơn thuê.
+                Lịch thuê, nguồn tạo đơn và thông tin người thuê được lưu cố định.
               </p>
             </div>
 
@@ -136,14 +132,32 @@ function OrderDetailContent({ order }: { order: Order }) {
                 <p className="mt-1 font-medium">{order.rentalEndDate}</p>
               </div>
               <div className="rounded-2xl bg-muted/30 p-4">
-                <p className="text-xs text-muted-foreground">Tạo lúc</p>
-                <p className="mt-1 font-medium">{new Date(order.createdAt).toLocaleString('vi-VN')}</p>
+                <p className="text-xs text-muted-foreground">Nguồn tạo đơn</p>
+                <p className="mt-1 font-medium">{sourceLabels[order.source]}</p>
               </div>
               <div className="rounded-2xl bg-muted/30 p-4">
-                <p className="text-xs text-muted-foreground">Số dòng sản phẩm</p>
-                <p className="mt-1 font-medium">{order.items.length}</p>
+                <p className="text-xs text-muted-foreground">Tạo lúc</p>
+                <p className="mt-1 font-medium">
+                  {new Date(order.createdAt).toLocaleString('vi-VN')}
+                </p>
               </div>
             </div>
+
+            {order.pickupDeadlineAt && (
+              <div className="rounded-2xl bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">Hạn đến lấy đồ</p>
+                <p className="mt-1 font-medium">
+                  {new Date(order.pickupDeadlineAt).toLocaleString('vi-VN')}
+                </p>
+              </div>
+            )}
+
+            {order.renterAddress && (
+              <div className="rounded-2xl border border-[var(--page-divider)] bg-white p-4">
+                <p className="text-sm font-semibold">Địa chỉ người thuê</p>
+                <p className="mt-2 text-sm text-muted-foreground">{order.renterAddress}</p>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-[var(--page-divider)] bg-white p-4">
               <p className="text-sm font-semibold">Ghi chú</p>
@@ -180,7 +194,7 @@ export function OrderDetailDialog({
               {orderId ? `Chi tiết đơn #${orderId}` : 'Chi tiết đơn thuê'}
             </DialogTitle>
             <DialogDescription>
-              Xem nhanh khách hàng, sản phẩm, thanh toán và các chứng từ của đơn thuê.
+              Xem thông tin người thuê, sản phẩm, thanh toán và chứng từ của đơn thuê.
             </DialogDescription>
           </DialogHeader>
 
@@ -227,5 +241,3 @@ export function OrderDetailDialog({
     </Dialog>
   );
 }
-
-export { OrderDetailContent, formatCurrency, paymentLabels, statusLabels };

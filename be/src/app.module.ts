@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UtilsModule } from './common/utils/utils.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
-import { UserModule } from './modules/user/user.module';
-import { CustomerModule } from './modules/customer/customer.module';
-import { ProductModule } from './modules/product/product.module';
-import { OrderModule } from './modules/order/order.module';
-import { ReportModule } from './modules/report/report.module';
 import { CategoryModule } from './modules/category/category.module';
-import { UtilsModule } from './common/utils/utils.module';
+import { OrderModule } from './modules/order/order.module';
+import { ProductModule } from './modules/product/product.module';
+import { RentalRequestModule } from './modules/rental-request/rental-request.module';
+import { ReportModule } from './modules/report/report.module';
 import { ShopModule } from './modules/shop/shop.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -32,11 +32,11 @@ import { ShopModule } from './modules/shop/shop.module';
     }),
     AuthModule,
     UserModule,
-    CustomerModule,
+    CategoryModule,
     ProductModule,
     OrderModule,
+    RentalRequestModule,
     ReportModule,
-    CategoryModule,
     ShopModule,
     UtilsModule,
   ],

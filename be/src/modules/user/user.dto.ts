@@ -1,18 +1,26 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Role } from '../../common/constants/roles.constant';
 
 export class CreateUserDto {
   @IsString()
-  @IsNotEmpty({ message: 'Tên đăng nhập không được để trống' })
+  @IsNotEmpty({ message: 'Ten dang nhap khong duoc de trong' })
   username: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
+  @IsNotEmpty({ message: 'Mat khau khong duoc de trong' })
   password: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Họ tên không được để trống' })
+  @IsNotEmpty({ message: 'Ho ten khong duoc de trong' })
   fullName: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
 
   @IsEnum(Role)
   @IsOptional()
@@ -28,6 +36,14 @@ export class UpdateUserDto {
   @IsOptional()
   password?: string;
 
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+
   @IsEnum(Role)
   @IsOptional()
   role?: Role;
@@ -35,10 +51,10 @@ export class UpdateUserDto {
 
 export class ChangePasswordDto {
   @IsString()
-  @IsNotEmpty({ message: 'Mật khẩu cũ không được để trống' })
+  @IsNotEmpty({ message: 'Mat khau cu khong duoc de trong' })
   oldPassword: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+  @IsNotEmpty({ message: 'Mat khau moi khong duoc de trong' })
   newPassword: string;
 }

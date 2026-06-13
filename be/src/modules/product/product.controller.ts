@@ -13,6 +13,9 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Role } from '../../common/constants/roles.constant';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { ProductService } from './product.service';
 import {
   CreateProductDto,
@@ -24,7 +27,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from '../../common/utils/upload.service';
 
 @Controller('products')
-@UseGuards(JwtAuthGuard)
 export class ProductController {
   constructor(
     private readonly productService: ProductService,
@@ -32,8 +34,16 @@ export class ProductController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateProductDto) {
-    return this.productService.create(dto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async create(@Body() dto: CreateProductDto) {
+    const product = await this.productService.create(dto);
+
+    return {
+      success: true,
+      message: 'Thêm sản phẩm thành công',
+      data: product,
+    };
   }
 
   @Get()
@@ -47,33 +57,68 @@ export class ProductController {
   }
 
   @Put(':id')
-  update(
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.productService.update(id, dto);
+    const product = await this.productService.update(id, dto);
+
+    return {
+      success: true,
+      message: 'Cập nhật sản phẩm thành công',
+      data: product,
+    };
   }
 
   @Put(':id/restore-damaged')
-  restoreDamagedStock(
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async restoreDamagedStock(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: RestoreDamagedProductDto,
   ) {
-    return this.productService.restoreDamagedStock(id, dto.quantity);
+    const product = await this.productService.restoreDamagedStock(
+      id,
+      dto.quantity,
+    );
+
+    return {
+      success: true,
+      message: 'Khôi phục hàng hư thành công',
+      data: product,
+    };
   }
 
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.productService.delete(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.productService.delete(id);
+
+    return {
+      success: true,
+      message: 'Xóa sản phẩm thành công',
+      data: result,
+    };
   }
 
   @Post(':id/upload')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
   @UseInterceptors(FileInterceptor('image'))
   async uploadImage(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
   ) {
     const imageUrl = await this.uploadService.uploadImage(file);
-    return this.productService.updateImage(id, imageUrl);
+    const product = await this.productService.updateImage(id, imageUrl);
+
+    return {
+      success: true,
+      message: 'Tải ảnh sản phẩm thành công',
+      data: product,
+    };
   }
 }

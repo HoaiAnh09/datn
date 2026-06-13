@@ -32,6 +32,12 @@ export class ShopSettings extends BaseEntity {
 
   @Column({ name: 'invoice_footer', nullable: true })
   invoiceFooter: string;
+
+  @Column({ name: 'hero_title', type: 'text', nullable: true })
+  heroTitle: string;
+
+  @Column({ name: 'hero_subtitle', type: 'text', nullable: true })
+  heroSubtitle: string;
 }
 
 export class ShopSettingsResponseDto {
@@ -46,6 +52,8 @@ export class ShopSettingsResponseDto {
   bankAccountNumber: string;
   bankAccountName: string;
   invoiceFooter: string;
+  heroTitle: string;
+  heroSubtitle: string;
 
   constructor(settings: ShopSettings) {
     this.id = settings.id;
@@ -59,5 +67,7 @@ export class ShopSettingsResponseDto {
     this.bankAccountNumber = settings.bankAccountNumber;
     this.bankAccountName = settings.bankAccountName;
     this.invoiceFooter = settings.invoiceFooter;
+    this.heroTitle = settings.heroTitle;
+    this.heroSubtitle = settings.heroSubtitle;
   }
 }

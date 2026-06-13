@@ -1,6 +1,6 @@
 Clothing Rental Shop Management System
 
-Hệ thống quản lý cửa hàng cho thuê trang phục, hỗ trợ quản lý sản phẩm, khách hàng, đơn thuê, thanh toán đặt cọc, hoàn cọc và thống kê kinh doanh.
+He thong quan ly cua hang cho thue trang phuc, ho tro quan ly san pham, don thue, yeu cau dat thue, thanh toan dat coc, tra do, hoan coc va thong ke kinh doanh.
 
 Technology Stack
 
@@ -18,6 +18,7 @@ Backend
 
 Authentication
 - JWT Authentication
+- HttpOnly Cookie
 
 Storage
 - Cloudinary
@@ -25,247 +26,211 @@ Storage
 PDF
 - Puppeteer
 
-Functional Requirements
+Core Business Model
 
-1. Authentication
-- Đăng nhập
-- Đăng xuất
-- Quản lý thông tin tài khoản
+1. Users & Roles
 
-1.1. Shop Management
-- Cập nhật tên shop
-- Cập nhật hotline
-- Cập nhật địa chỉ
-- Cập nhật email
-- Cập nhật mã số thuế
-- Cập nhật thông tin ngân hàng
-- Cập nhật footer mặc định cho hóa đơn/biên nhận
+He thong chi co 2 role:
+- `OWNER`: chu cua hang, van hanh toan bo he thong
+- `CUSTOMER`: khach hang tu dang ky tai khoan de gui yeu cau dat thue
 
-2. Customer Management
-- Thêm khách hàng
-- Cập nhật thông tin khách hàng
-- Xóa khách hàng
-- Tìm kiếm khách hàng
-- Xem lịch sử thuê của khách hàng
+Thong tin user
+- `username`
+- `password`
+- `fullName`
+- `phoneNumber`
+- `address`
+- `role`
 
-Thông tin lưu trữ
-- Họ tên
-- Số điện thoại
-- Địa chỉ
-- Ghi chú
+Nguyen tac
+- `OWNER` quan ly san pham, danh muc, cau hinh shop, don thue, yeu cau dat thue
+- `CUSTOMER` chi duoc xem va cap nhat thong tin cua chinh minh, gui yeu cau dat thue, xem yeu cau va don cua minh
+- Khach vang lai khong bat buoc co tai khoan
 
-3. Product & Inventory Management
+2. Product & Inventory Management
 
-Hệ thống quản lý sản phẩm theo số lượng, không quản lý theo từng instance.
+He thong quan ly san pham theo so luong, khong quan ly theo tung item instance.
 
-Thông tin sản phẩm
-- Tên sản phẩm
-- Mô tả
-- Giá thuê/ngày
-- Tiền đặt cọc
-- Phí phạt hư hỏng chuẩn
-- Tổng số lượng vật lý
-- Số lượng đang hư
-- Ảnh sản phẩm
-- Danh mục
+Thong tin san pham
+- Ten san pham
+- Mo ta
+- Gia thue/ngay
+- Tien dat coc
+- Phi hu hong chuan
+- Tong so luong ton
+- So luong dang hu
+- So luong kha dung
+- Anh san pham
+- Danh muc
 
-Ý nghĩa các trường tồn kho
-- `stockQuantity`: tổng số lượng vật lý mà cửa hàng đang sở hữu
-- `damagedQuantity`: số lượng đang hư hoặc chưa sẵn sàng cho thuê
-- `availableQuantity`: số lượng có thể cho thuê trong một thời điểm hoặc khoảng ngày cụ thể
+Y nghia ton kho
+- `stockQuantity`: tong so luong vat ly cua shop
+- `damagedQuantity`: so luong dang hu hoac chua san sang cho thue
+- `availableQuantity`: so luong co the cho thue trong mot khoang ngay cu the
 
-Công thức khả dụng
+Cong thuc kha dung
 - `availableQuantity = stockQuantity - damagedQuantity - reservedInOverlap`
 
-Trong đó:
-- `reservedInOverlap` là tổng số lượng đã nằm trong các đơn `PENDING` hoặc `RENTING` có khoảng ngày giao nhau với khoảng thuê đang xét
+Trong do:
+- `reservedInOverlap` la tong so luong nam trong cac don `PENDING` hoac `RENTING` co khoang ngay giao nhau
 
-Chức năng
-- Thêm sản phẩm
-- Cập nhật sản phẩm
-- Xóa sản phẩm
-- Upload ảnh sản phẩm
-- Tìm kiếm sản phẩm
-- Xem tổng kho, đang hư, khả dụng
-- Khôi phục hàng hư
+Nguyen tac
+- Yeu cau dat thue cua khach `SUBMITTED` khong giu hang
+- Chi `orders` o trang thai `PENDING` va `RENTING` moi giu hang
+
+3. Rental Request Management
+
+Khach hang co tai khoan co the gui yeu cau dat thue tren website.
+
+Muc tieu
+- Ho tro self-service cho khach
+- Khong giu hang ao truoc khi owner duyet
+- Giu luong van hanh don thue tai quay don gian
+
+Thong tin yeu cau dat thue
+- Nguoi gui yeu cau (`userId`)
+- Ngay thue
+- Ngay tra
+- Danh sach san pham va so luong
+- Ghi chu
+- Trang thai
+- Ghi chu duyet/tu choi
+- Don duoc tao sau khi duyet, neu co
+
+Trang thai yeu cau
+- `SUBMITTED`: khach vua gui, chua duyet, chua giu hang
+- `APPROVED`: owner da duyet va da tao `order PENDING`
+- `REJECTED`: owner tu choi
+- `CANCELLED`: khach tu huy truoc khi duyet
+
+Nguyen tac
+- Owner duyet yeu cau tai thoi diem xu ly
+- Khi owner duyet, he thong phai kiem tra ton thuc te theo khoang ngay
+- Neu du ton, he thong tao `order` that va chuyen request sang `APPROVED`
+- Neu khong du ton, owner tu choi request
 
 4. Rental Order Management
 
-Quản lý quy trình cho thuê trang phục theo khoảng thời gian thuê.
+`Order` la giao dich van hanh thuc te cua cua hang.
 
-Tạo đơn thuê
-- Chọn khách hàng
-- Chọn sản phẩm
-- Chọn số lượng
-- Chọn ngày thuê
-- Chọn ngày trả
-- Tính toán tự động
-  - Số ngày tính tiền
-  - Tiền thuê
-  - Tiền đặt cọc
-  - Tổng số tiền cần thanh toán
+Nguon tao don
+- `OWNER_DIRECT`: owner tao truc tiep tai quay cho khach vang lai hoac khach co san
+- `CUSTOMER_REQUEST`: don sinh ra tu request duoc duyet
 
-Quy tắc tính tiền thuê
-- `rentalPrice` trên sản phẩm được hiểu là giá thuê/ngày
-- Số ngày tính tiền = số ngày lịch từ `rentalStartDate` đến `rentalEndDate`, tính cả ngày bắt đầu và ngày kết thúc
-- Thuê cùng ngày và trả cùng ngày vẫn tính là `1` ngày
-- `tiền thuê dòng = rentalPricePerDay * quantity * chargeableDays`
-- `tổng tiền thuê đơn = tổng tiền thuê các dòng`
-- `tiền cọc = depositAmount * quantity`, không nhân theo số ngày
+Thong tin don
+- `renterUserId`: lien ket den user neu co, co the null voi khach vang lai
+- `renterFullName`
+- `renterPhoneNumber`
+- `renterAddress`
+- `requestId`: nullable, neu don tao tu request
+- `source`
+- `rentalStartDate`
+- `rentalEndDate`
+- `items`
+- `rentalPrice`
+- `depositAmount`
+- `penaltyAmount`
+- `refundAmount`
+- `paymentStatus`
+- `status`
+- `pickupDeadlineAt`: thoi han den lay do cho don duoc duyet tu request
+- `note`
 
-Trạng thái đơn
-- `PENDING`: đơn đã tạo, đang giữ số lượng cho khoảng ngày thuê nhưng chưa xác nhận thanh toán
-- `RENTING`: đã xác nhận thanh toán, đang cho thuê
-- `RETURNED`: đã trả đồ, hoàn tất tính phạt và hoàn cọc
-- `CANCELLED`: đơn đã hủy, không còn giữ số lượng
+Order snapshot
+- Thong tin nguoi thue duoc luu truc tiep tren `orders`
+- Khong phu thuoc vao viec user co sua profile sau nay hay khong
+- Du lieu in hoa don va lich su don luon dung theo thoi diem tao don
 
-Chức năng đơn thuê
-- Tạo đơn thuê
-- Tìm kiếm và lọc đơn thuê
-- Xem chi tiết đơn thuê
-- Xác nhận thanh toán
-- Trả đồ
-- Hủy đơn
-- Tải hóa đơn
-- Tải biên nhận hoàn cọc
+Trang thai don
+- `PENDING`: da tao don that, da giu hang, chua xac nhan thanh toan/dat coc
+- `RENTING`: da xac nhan thanh toan, khach da nhan do
+- `RETURNED`: da tra do, da tinh phi phat va hoan coc neu co
+- `CANCELLED`: don da huy, khong con giu hang
 
-Chi tiết đơn thuê
-- Hiển thị khách hàng, trạng thái, thanh toán, tiền thuê, tiền cọc, tiền phạt, hoàn cọc
-- Hiển thị toàn bộ sản phẩm trong đơn
-- Có link mở nhanh sang màn khách hàng và sản phẩm liên quan
+5. Payment Management
 
-5. Inventory Availability Control
+Thanh toan tai quay.
 
-Kiểm soát số lượng sản phẩm khả dụng trong khoảng thời gian thuê.
-
-Chức năng
-- Kiểm tra khả dụng trước khi tạo đơn
-- Tính số lượng đã được giữ/thuê trong khoảng thời gian giao nhau
-- Từ chối đơn nếu vượt quá số lượng khả dụng
-
-Nguyên tắc
-- Không trừ trực tiếp `stockQuantity` khi tạo đơn
-- Tồn kho cho thuê được xác định theo công thức khả dụng
-- Đơn `PENDING` vẫn giữ hàng cho khoảng ngày thuê
-- Đơn `RETURNED` và `CANCELLED` không còn giữ số lượng
-
-Mục tiêu
-- Đúng nghiệp vụ thuê theo lịch
-- Không cho thuê vượt số lượng trong cùng khoảng ngày
-
-6. Payment Management
-
-Mô phỏng thanh toán tại quầy.
-
-Chức năng
-- Tạo đơn và hiển thị tổng tiền cần thanh toán
-- Sinh mã QR thanh toán
-- Xác nhận đã nhận thanh toán
-- Tải/in lại hóa đơn khi đơn đã xác nhận thanh toán
-- Tải/in lại hóa đơn và biên nhận sau khi khách đã trả đồ
-
-Trạng thái thanh toán
+Trang thai thanh toan
 - `UNPAID`
 - `DEPOSIT_PAID`
 - `REFUNDED`
 
-Thông tin thanh toán
-- Tiền thuê
-- Tiền đặt cọc
-- Thời gian thanh toán
+Nguyen tac
+- QR chi phuc vu thong tin thanh toan, khong bat buoc la buoc thanh toan online
+- Don chi chuyen `PENDING -> RENTING` khi owner xac nhan thanh toan/dat coc
+- Bao cao doanh thu khong tinh tien dat coc
 
-Nguyên tắc hóa đơn
-- Hóa đơn và biên nhận dùng thông tin từ màn cấu hình shop
-- Hóa đơn không hiển thị QR tra cứu
-- QR chỉ dùng cho luồng thanh toán, không phải một phần bắt buộc của hóa đơn in ra
+6. Return & Deposit Refund Process
 
-7. Return & Deposit Refund Process
+Khi tra do, owner ghi nhan theo tung san pham:
+- So luong tra binh thuong
+- So luong hu hong
+- Phi phat khac neu co
 
-Quản lý quy trình trả đồ theo số lượng.
-
-Khi trả đồ, mỗi sản phẩm được ghi nhận:
-- Số lượng trả bình thường
-- Số lượng hư hỏng
-- Phụ phí khác nếu có
-
-Nguyên tắc xử lý
-- Số lượng trả bình thường tự quay lại pool khả dụng
-- Số lượng hư không quay lại khả dụng ngay
-- Số lượng hư được cộng vào `damagedQuantity`
-- Khi đã sửa xong, nhân viên dùng chức năng `Khôi phục hàng hư` ở trang sản phẩm để giảm `damagedQuantity`
-
-Tính phạt
-- `damageFee` trên sản phẩm là mức phạt chuẩn tham chiếu
-- `penaltyAmount` trên đơn là tổng mức phạt thực tế
-
-Công thức
+Cong thuc
 - `penaltyAmount = sum(damagedReturnedQuantity * damageFee) + extraPenaltyAmount`
 - `refundAmount = max(0, depositAmount - penaltyAmount)`
 
-Chức năng
-- Xác nhận khách trả đồ
-- Ghi nhận số lượng hư theo từng sản phẩm
-- Nhập phụ phí khác nếu có
-- Tính hoàn cọc
-- Hoàn tất đơn hàng
-- Hiển thị số tiền cần hoàn cho khách
-- Xác nhận đã hoàn cọc
+Nguyen tac
+- Hang hu duoc cong vao `damagedQuantity`
+- Hang binh thuong quay lai kha dung
+- Tra som khong lam giam tien thue
 
-8. Reports & Statistics
+7. Reports & Statistics
 
-Chức năng
-- Tổng doanh thu
-- Số lượng đơn thuê
-- Doanh thu theo tháng
-- Top sản phẩm được thuê nhiều
-- Danh sách sản phẩm khả dụng thấp
+Chi tinh tren `orders`, khong tinh tren `rental_requests`.
 
-Nguyên tắc thống kê doanh thu
-- `Tổng doanh thu` chỉ tính từ các đơn `RETURNED`
-- Doanh thu thực nhận = `rentalPrice + penaltyAmount`
-- Không tính `depositAmount` vào doanh thu vì tiền cọc chỉ là khoản giữ và có thể hoàn lại
-- `Doanh thu theo tháng` được nhóm theo tháng hoàn tất đơn hàng
+Chi so
+- Tong doanh thu
+- So luong don thue
+- Don cho thanh toan
+- Don dang cho thue
+- Doanh thu theo thang
+- Top san pham duoc thue nhieu
+- Danh sach san pham ton thap
 
-Business Workflow
+Nguyen tac doanh thu
+- Chi tinh tu don `RETURNED`
+- Doanh thu thuc nhan = `rentalPrice + penaltyAmount`
+- Khong tinh `depositAmount` vao doanh thu
 
-Thuê trang phục
-1. Chủ shop tạo đơn thuê
-2. Chọn khách hàng, sản phẩm, số lượng, ngày thuê, ngày trả
-3. Hệ thống kiểm tra `availableQuantity` theo khoảng ngày
-4. Hệ thống tính tiền thuê + tiền cọc
-5. Sinh QR thanh toán
-6. Xác nhận đã thanh toán
-7. Có thể tải/in hóa đơn thanh toán kiểu bill cửa hàng
-8. Đơn chuyển sang `RENTING`
+8. Functional Workflows
 
-Trả trang phục
-1. Khách trả đồ
-2. Chủ shop kiểm tra số lượng trả bình thường và số lượng hư
-3. Hệ thống tính tiền phạt theo `damageFee` chuẩn và phụ phí khác
-4. Hệ thống tính số tiền hoàn cọc
-5. Chủ shop xác nhận đã hoàn cọc
-6. Có thể tải lại hóa đơn thuê và in biên nhận hoàn cọc
-7. Đơn chuyển sang `RETURNED`
+8.1. Customer self-service
+1. Khach vao trang chu
+2. Chon ngay thue, ngay tra
+3. Xem san pham kha dung
+4. Dang nhap hoac dang ky tai khoan
+5. Gui `rental request`
+6. Owner duyet hoac tu choi
+7. Neu duyet, he thong tao `order PENDING`
+8. Khach den quay truoc `pickupDeadlineAt`
+9. Owner xac nhan thanh toan va giao do
+10. Don chuyen sang `RENTING`
 
-Nguyên tắc trả sớm
-- Trả sớm không làm giảm `tiền thuê`
-- Lý do: cửa hàng đã giữ hàng cho toàn bộ khoảng ngày thuê đã chốt, nên doanh thu thuê vẫn tính theo lịch đã đặt
-- Nếu chủ shop muốn hỗ trợ khách, phần giảm giá hoặc hỗ trợ riêng nên xử lý thủ công ngoài flow chuẩn
+8.2. Walk-in order
+1. Khach den cua hang
+2. Owner tao don truc tiep
+3. Owner nhap snapshot thong tin nguoi thue
+4. He thong kiem tra ton theo khoang ngay
+5. Don tao o `PENDING`
+6. Owner thu tien/dat coc
+7. Don chuyen sang `RENTING`
 
-Khôi phục hàng hư
-1. Nhân viên vào trang sản phẩm
-2. Chọn sản phẩm có `damagedQuantity > 0`
-3. Nhập số lượng đã sửa xong
-4. Hệ thống giảm `damagedQuantity`
-5. Số lượng vừa khôi phục quay lại `availableQuantity`
+8.3. Return order
+1. Khach tra do
+2. Owner kiem tra tinh trang do
+3. He thong tinh phi phat va tien hoan coc
+4. Owner xac nhan hoan tat
+5. Don chuyen sang `RETURNED`
 
-Project Objectives
+9. Project Objectives
 
-Hệ thống giúp cửa hàng:
-- Quản lý khách hàng
-- Quản lý sản phẩm và tồn kho theo số lượng
-- Quản lý đơn thuê theo khoảng ngày
-- Theo dõi thanh toán đặt cọc
-- Hỗ trợ hoàn cọc khi trả đồ
-- Tách rõ hàng hư và hàng khả dụng
-- Theo dõi doanh thu và hoạt động kinh doanh
+He thong giup cua hang:
+- Ban va van hanh don cho thue tai quay
+- Nhan yeu cau dat thue online tu khach
+- Kiem soat ton theo lich thue
+- Quan ly thanh toan dat coc va hoan coc
+- Bao cao doanh thu thuc te
+- Giu lich su giao dich nhat quan bang order snapshot

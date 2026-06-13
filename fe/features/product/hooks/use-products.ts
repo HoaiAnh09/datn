@@ -6,10 +6,10 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { productApi } from '../api';
 import { toast } from 'sonner';
 import type { Product } from '@/common/types';
 import { getErrorMessage } from '@/common/utils/error';
+import { productApi } from '../api';
 
 export function useProducts(search?: string, category?: string) {
   return useQuery({
@@ -21,7 +21,7 @@ export function useProducts(search?: string, category?: string) {
 
 export function useProductsAvailability(
   rentalStartDate?: string,
-  rentalEndDate?: string
+  rentalEndDate?: string,
 ) {
   return useQuery({
     queryKey: ['products', 'availability', rentalStartDate, rentalEndDate],
@@ -43,9 +43,11 @@ export function useCreateProduct() {
 
   return useMutation({
     mutationFn: productApi.create,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Thêm sản phẩm thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi thêm sản phẩm'));
@@ -59,12 +61,14 @@ export function useUpdateProduct() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) =>
       productApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Cập nhật sản phẩm thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Lỗi khi cập nhật'));
+      toast.error(getErrorMessage(error, 'Lỗi khi cập nhật sản phẩm'));
     },
   });
 }
@@ -75,9 +79,11 @@ export function useUploadProductImage() {
   return useMutation({
     mutationFn: ({ id, file }: { id: number; file: File }) =>
       productApi.uploadImage(id, file),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Tải ảnh sản phẩm thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi tải ảnh sản phẩm'));
@@ -90,12 +96,14 @@ export function useDeleteProduct() {
 
   return useMutation({
     mutationFn: productApi.delete,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Xóa sản phẩm thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Lỗi khi xóa'));
+      toast.error(getErrorMessage(error, 'Lỗi khi xóa sản phẩm'));
     },
   });
 }
@@ -106,10 +114,12 @@ export function useRestoreDamagedProduct() {
   return useMutation({
     mutationFn: ({ id, quantity }: { id: number; quantity: number }) =>
       productApi.restoreDamagedStock(id, quantity),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Khôi phục hàng hư thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Lỗi khi khôi phục hàng hư'));

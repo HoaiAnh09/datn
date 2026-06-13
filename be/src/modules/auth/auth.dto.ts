@@ -1,11 +1,14 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
+import { CreateUserDto } from '../user/user.dto';
 
 export class LoginDto {
   @IsString()
-  @IsNotEmpty({ message: 'Tên đăng nhập không được để trống' })
+  @IsNotEmpty({ message: 'Ten dang nhap khong duoc de trong' })
   username: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
+  @IsNotEmpty({ message: 'Mat khau khong duoc de trong' })
   password: string;
 }
+
+export class RegisterDto extends CreateUserDto {}

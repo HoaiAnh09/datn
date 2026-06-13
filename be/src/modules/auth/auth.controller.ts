@@ -1,17 +1,17 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  Res,
-  Req,
-  UseGuards,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Post,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
-import type { Response, Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from './auth.dto';
+import { LoginDto, RegisterDto } from './auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const cookieOptions = {
@@ -23,7 +23,7 @@ const cookieOptions = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -45,6 +45,17 @@ export class AuthController {
     };
   }
 
+  @Post('register')
+  async register(@Body() dto: RegisterDto) {
+    const user = await this.authService.register(dto);
+
+    return {
+      success: true,
+      message: 'Đăng ký thành công',
+      data: user,
+    };
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) res: Response) {
@@ -59,8 +70,9 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMe(@Req() req: Request) {
-    const user = req.user as any;
+    const user = req.user as { id: number };
     const result = await this.authService.getMe(user.id);
+
     return {
       success: true,
       message: 'Lấy thông tin thành công',
