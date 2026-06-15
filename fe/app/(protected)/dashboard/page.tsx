@@ -1,17 +1,19 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { useAuthStore } from '@/common/stores/auth.store';
-import { OrderStatus } from '@/common/types';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  CalendarDays,
+  CircleDollarSign,
+  Clock3,
+  Package,
+  ReceiptText,
+  Store,
+} from 'lucide-react';
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts';
+import { useAuthStore } from '@/common/stores/auth.store';
+import { OrderStatus, RentalRequestStatus } from '@/common/types';
+import { Button } from '@/components/ui/button';
 import {
   ChartContainer,
   ChartLegend,
@@ -20,13 +22,14 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { OrderDetailDialog } from '@/features/order/components/order-detail-dialog';
+import { useMyOrders } from '@/features/order/hooks/use-orders';
 import { useDashboard } from '@/features/report/hooks/use-reports';
-import { CalendarDays, CircleDollarSign, Clock3, Package } from 'lucide-react';
+import { useMyRentalRequests } from '@/features/rental-request/hooks/use-rental-requests';
 
 function formatCurrency(value: number) {
-  return `${value.toLocaleString('vi-VN')}đ`;
+  return `${Number(value).toLocaleString('vi-VN')} đ`;
 }
 
 function getOrderStatusLabel(status: OrderStatus) {
@@ -38,6 +41,21 @@ function getOrderStatusLabel(status: OrderStatus) {
     case OrderStatus.RETURNED:
       return 'Đã trả';
     case OrderStatus.CANCELLED:
+      return 'Đã hủy';
+    default:
+      return status;
+  }
+}
+
+function getRequestStatusLabel(status: RentalRequestStatus) {
+  switch (status) {
+    case RentalRequestStatus.SUBMITTED:
+      return 'Mới gửi';
+    case RentalRequestStatus.APPROVED:
+      return 'Đã duyệt';
+    case RentalRequestStatus.REJECTED:
+      return 'Từ chối';
+    case RentalRequestStatus.CANCELLED:
       return 'Đã hủy';
     default:
       return status;
@@ -59,7 +77,7 @@ function GradientStatCard({
 }) {
   return (
     <article
-      className="relative flex min-h-[196px] flex-col overflow-hidden rounded-[1.8rem] p-4 text-white shadow-lg sm:min-h-[220px] sm:rounded-3xl sm:p-6"
+      className="relative flex min-h-[196px] flex-col overflow-hidden rounded-[1.8rem] p-4 text-white shadow-lg sm:min-h-[220px] sm:p-6"
       style={{ background: gradient }}
     >
       <div className="flex items-start justify-between gap-4">
@@ -89,8 +107,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export default function DashboardPage() {
-  const user = useAuthStore((state) => state.user);
+function OwnerDashboard() {
   const { data: dashboardResponse, isLoading } = useDashboard();
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -100,19 +117,20 @@ export default function DashboardPage() {
   const recentOrders = dashboard?.recentOrders ?? [];
   const lowStockProducts = dashboard?.lowStockProducts ?? [];
   const topProducts = dashboard?.topProducts ?? [];
+
   const dashboardStats = [
     {
       title: 'Tổng doanh thu',
-      value: dashboard?.totalRevenue ? formatCurrency(dashboard.totalRevenue) : '0đ',
-      note: 'Từ các đơn đã trả.',
+      value: dashboard?.totalRevenue ? formatCurrency(dashboard.totalRevenue) : '0 đ',
+      note: 'Tính từ các đơn đã trả và hoàn tất vận hành.',
       gradient:
         'radial-gradient(circle at top left, rgba(255,255,255,0.35), transparent 36%), linear-gradient(135deg, #725bff 0%, #ff9276 100%)',
       icon: CircleDollarSign,
     },
     {
-      title: 'Đơn ưu tiên',
+      title: 'Đơn chờ thanh toán',
       value: dashboard?.pendingOrders ?? 0,
-      note: 'Đơn cần xác nhận thanh toán.',
+      note: 'Những đơn đã duyệt hoặc tạo tại quầy nhưng chưa thu tiền.',
       gradient:
         'radial-gradient(circle at top left, rgba(255,255,255,0.32), transparent 32%), linear-gradient(135deg, #00b7c2 0%, #6ea8ff 100%)',
       icon: Clock3,
@@ -120,14 +138,12 @@ export default function DashboardPage() {
     {
       title: 'Đang cho thuê',
       value: dashboard?.rentingOrders ?? 0,
-      note: 'Đơn đang hoạt động cần theo dõi.',
+      note: 'Các đơn đang vận hành và cần theo dõi lịch trả đồ.',
       gradient:
         'radial-gradient(circle at top left, rgba(255,255,255,0.34), transparent 34%), linear-gradient(135deg, #ff8a7a 0%, #ffc36b 100%)',
       icon: Package,
     },
   ];
-
-  const hasRevenueData = revenue.length > 0;
 
   if (isLoading) {
     return (
@@ -156,7 +172,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
-          Chào mừng, {user?.fullName || 'Quản lý'}
+          Chào mừng quay lại
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Tổng quan nhanh về doanh thu, đơn thuê và tồn kho hiện tại.
@@ -187,12 +203,12 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-lg font-bold text-foreground">Doanh thu theo tháng</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Doanh thu và số đơn dựa trên dữ liệu thực tế.
+                  Theo dõi doanh thu và số đơn hoàn tất qua từng tháng.
                 </p>
               </div>
             </div>
 
-            {hasRevenueData ? (
+            {revenue.length > 0 ? (
               <div className="mt-6">
                 <div className="mb-4 flex items-baseline gap-3">
                   <p className="text-sm text-muted-foreground">Tháng gần nhất</p>
@@ -201,7 +217,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-muted/30 p-4">
+                <div className="rounded-2xl bg-muted/30 p-4 pl-6">
                   <ChartContainer config={chartConfig} className="h-[240px] w-full">
                     <ComposedChart data={revenue}>
                       <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -217,7 +233,7 @@ export default function DashboardPage() {
                         axisLine={false}
                         width={72}
                         tickFormatter={(value) =>
-                          `${Number(value).toLocaleString('vi-VN')}đ`
+                          `${Number(value).toLocaleString('vi-VN')} đ`
                         }
                       />
                       <YAxis
@@ -258,26 +274,10 @@ export default function DashboardPage() {
                           strokeWidth: 0,
                           r: 4,
                         }}
-                        activeDot={{
-                          r: 5,
-                        }}
+                        activeDot={{ r: 5 }}
                       />
                     </ComposedChart>
                   </ChartContainer>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {revenue.slice(-4).map((item) => (
-                    <div
-                      key={item.month}
-                      className="rounded-2xl bg-muted/30 px-3 py-2.5"
-                    >
-                      <p className="text-xs font-medium text-foreground">{item.month}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.orderCount} đơn
-                      </p>
-                    </div>
-                  ))}
                 </div>
               </div>
             ) : (
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             <div>
               <h2 className="text-lg font-bold text-foreground">Tổng quan</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Doanh thu chỉ tính từ đơn đã hoàn tất và gồm cả tiền phạt.
+                Các chỉ số vận hành cốt lõi của cửa hàng.
               </p>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -329,7 +329,7 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-lg font-bold text-foreground">Đơn gần đây</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Dữ liệu từ hệ thống hiện tại
+                  Theo dõi nhanh các đơn mới phát sinh.
                 </p>
               </div>
               <div className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -348,7 +348,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {order.customerName}
+                      {order.renterName}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {order.rentalStartDate} · {getOrderStatusLabel(order.status)}
@@ -379,7 +379,9 @@ export default function DashboardPage() {
           <div className="rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm">
             <div>
               <h2 className="text-lg font-bold text-foreground">Tồn kho thấp</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Sản phẩm cần chú ý</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sản phẩm cần chú ý trong kho.
+              </p>
             </div>
 
             <div className="mt-5 space-y-4">
@@ -417,7 +419,7 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-lg font-bold text-foreground">Top sản phẩm</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Sản phẩm được thuê nhiều nhất
+                  Sản phẩm được thuê nhiều nhất.
                 </p>
               </div>
 
@@ -455,4 +457,306 @@ export default function DashboardPage() {
       />
     </div>
   );
+}
+
+function CustomerDashboard() {
+  const { data: ordersResponse, isLoading: ordersLoading } = useMyOrders();
+  const { data: requestsResponse, isLoading: requestsLoading } = useMyRentalRequests();
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  const orders = ordersResponse?.data ?? [];
+  const requests = requestsResponse?.data ?? [];
+
+  const approvedRequests = requests.filter(
+    (request) => request.status === RentalRequestStatus.APPROVED,
+  ).length;
+  const pendingPickupOrders = orders.filter(
+    (order) => order.status === OrderStatus.PENDING,
+  );
+  const activeOrders = orders.filter((order) => order.status === OrderStatus.RENTING);
+
+  const stats = [
+    {
+      title: 'Yêu cầu đã gửi',
+      value: requests.length,
+      note: 'Tổng số yêu cầu đặt thuê bạn đã gửi lên hệ thống.',
+      gradient:
+        'radial-gradient(circle at top left, rgba(255,255,255,0.35), transparent 36%), linear-gradient(135deg, #5f7cff 0%, #6fd7ff 100%)',
+      icon: ReceiptText,
+    },
+    {
+      title: 'Đã được duyệt',
+      value: approvedRequests,
+      note: 'Những yêu cầu đã được cửa hàng xác nhận và chuyển thành đơn.',
+      gradient:
+        'radial-gradient(circle at top left, rgba(255,255,255,0.32), transparent 32%), linear-gradient(135deg, #ff8c6b 0%, #ffbc6d 100%)',
+      icon: Clock3,
+    },
+    {
+      title: 'Đơn đang thuê',
+      value: activeOrders.length,
+      note: 'Các đơn đang vận hành và cần theo dõi ngày trả đồ.',
+      gradient:
+        'radial-gradient(circle at top left, rgba(255,255,255,0.34), transparent 34%), linear-gradient(135deg, #00b7c2 0%, #6ea8ff 100%)',
+      icon: Package,
+    },
+  ];
+
+  if (ordersLoading || requestsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-64 rounded-3xl" />
+          <Skeleton className="h-64 rounded-3xl" />
+          <Skeleton className="h-64 rounded-3xl sm:col-span-2 xl:col-span-1" />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <Skeleton className="h-[360px] rounded-3xl" />
+          <Skeleton className="h-[360px] rounded-3xl" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
+            Theo dõi đơn thuê của bạn
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Xem nhanh yêu cầu đã gửi, đơn đang chờ nhận và đơn đang thuê.
+          </p>
+        </div>
+        <Button asChild className="rounded-full px-5">
+          <Link href="/">
+            <Store className="mr-2 size-4" />
+            Chọn thêm đồ
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {stats.map((item, index) => (
+          <div
+            key={item.title}
+            className={index === stats.length - 1 ? 'sm:col-span-2 xl:col-span-1' : undefined}
+          >
+            <GradientStatCard
+              title={item.title}
+              value={item.value}
+              note={item.note}
+              gradient={item.gradient}
+              icon={item.icon}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Việc cần làm tiếp theo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Những đầu việc quan trọng để bạn không lỡ lịch nhận hoặc trả đồ.
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {pendingPickupOrders.length === 0 && activeOrders.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--page-divider)] p-6 text-center text-sm text-muted-foreground">
+                Hiện chưa có đơn nào cần xử lý ngay.
+              </div>
+            ) : (
+              <>
+                {pendingPickupOrders.slice(0, 3).map((order) => (
+                  <article
+                    key={order.id}
+                    className="rounded-2xl border border-[var(--page-divider)] bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Đơn #{order.id}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Chờ bạn đến quầy thanh toán và nhận đồ.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                        {getOrderStatusLabel(order.status)}
+                      </span>
+                    </div>
+                    {order.pickupDeadlineAt && (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Hạn nhận: {new Date(order.pickupDeadlineAt).toLocaleString('vi-VN')}
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => {
+                        setSelectedOrderId(order.id);
+                        setDetailDialogOpen(true);
+                      }}
+                    >
+                      Xem chi tiết đơn
+                    </Button>
+                  </article>
+                ))}
+
+                {activeOrders.slice(0, 3).map((order) => (
+                  <article
+                    key={order.id}
+                    className="rounded-2xl border border-[var(--page-divider)] bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Đơn #{order.id}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Bạn đang thuê đồ, nhớ theo dõi ngày trả.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                        {getOrderStatusLabel(order.status)}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Trả trước ngày: {order.rentalEndDate}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => {
+                        setSelectedOrderId(order.id);
+                        setDetailDialogOpen(true);
+                      }}
+                    >
+                      Xem chi tiết đơn
+                    </Button>
+                  </article>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Đơn mới nhất</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mở nhanh chi tiết đơn để xem thời gian thuê và tiền cọc.
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {orders.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--page-divider)] p-6 text-center text-sm text-muted-foreground">
+                Bạn chưa có đơn thuê nào.
+              </div>
+            ) : (
+              orders.slice(0, 5).map((order) => (
+                <article
+                  key={order.id}
+                  className="rounded-2xl border border-[var(--page-divider)] bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Đơn #{order.id}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {order.rentalStartDate} · {order.rentalEndDate}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                      {getOrderStatusLabel(order.status)}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-2xl bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Tiền thuê</p>
+                      <p className="mt-1 font-medium">{formatCurrency(order.rentalPrice)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Tiền cọc</p>
+                      <p className="mt-1 font-medium">{formatCurrency(order.depositAmount)}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => {
+                      setSelectedOrderId(order.id);
+                      setDetailDialogOpen(true);
+                    }}
+                  >
+                    Xem chi tiết
+                  </Button>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm lg:col-span-2">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Yêu cầu gần đây</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Trạng thái xét duyệt mới nhất từ cửa hàng.
+            </p>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {requests.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--page-divider)] p-6 text-center text-sm text-muted-foreground">
+                Bạn chưa gửi yêu cầu đặt thuê nào.
+              </div>
+            ) : (
+              requests.slice(0, 5).map((request) => (
+                <article
+                  key={request.id}
+                  className="rounded-2xl border border-[var(--page-divider)] bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Yêu cầu #{request.id}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {request.rentalStartDate} · {request.rentalEndDate}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                      {getRequestStatusLabel(request.status)}
+                    </span>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <OrderDetailDialog
+        open={detailDialogOpen}
+        orderId={selectedOrderId}
+        onOpenChange={(nextOpen) => {
+          setDetailDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setSelectedOrderId(null);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const user = useAuthStore((state) => state.user);
+
+  if (user?.role === 'CUSTOMER') {
+    return <CustomerDashboard />;
+  }
+
+  return <OwnerDashboard />;
 }

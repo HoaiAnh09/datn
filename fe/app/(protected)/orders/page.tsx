@@ -1,22 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  CalendarRange,
-  Download,
-  Plus,
-  RotateCcw,
-  Search,
-  ShoppingBag,
-  Wallet,
-} from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
-import { API_BASE_URL } from '@/common/api';
-import { Order, OrderStatus, PaymentStatus } from '@/common/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
+import { Search, ShoppingBag, Wallet } from 'lucide-react';
+import { useAuthStore } from '@/common/stores/auth.store';
+import { Order, OrderStatus } from '@/common/types';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -35,37 +26,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { OrderDetailDialog } from '@/features/order/components/order-detail-dialog';
+import {
+  OrderDetailDialog,
+  formatCurrency,
+  paymentLabels,
+  statusLabels,
+} from '@/features/order/components/order-detail-dialog';
 import { OrderForm } from '@/features/order/components/order-form';
 import {
   useCancelOrder,
   useConfirmPayment,
+  useMyOrders,
   useOrders,
   useReturnOrder,
 } from '@/features/order/hooks/use-orders';
-import {
-  returnOrderSchema,
-  type ReturnOrderFormData,
-} from '@/features/order/schema';
-import { useDebounce } from '@/common/hooks/use-debounce';
+import { returnOrderSchema, type ReturnOrderFormData } from '@/features/order/schema';
 import { cn } from '@/lib/utils';
-
-const statusLabels: Record<OrderStatus, string> = {
-  [OrderStatus.PENDING]: 'Chờ thanh toán',
-  [OrderStatus.RENTING]: 'Đang cho thuê',
-  [OrderStatus.RETURNED]: 'Đã trả',
-  [OrderStatus.CANCELLED]: 'Đã hủy',
-};
-
-const paymentLabels: Record<PaymentStatus, string> = {
-  [PaymentStatus.UNPAID]: 'Chưa thanh toán',
-  [PaymentStatus.DEPOSIT_PAID]: 'Đã đặt cọc',
-  [PaymentStatus.REFUNDED]: 'Đã hoàn cọc',
-};
-
-function formatCurrency(value: number) {
-  return `${Number(value).toLocaleString('vi-VN')}đ`;
-}
 
 function getReturnDefaultValues(order?: Order | null): ReturnOrderFormData {
   return {
@@ -80,7 +56,134 @@ function getReturnDefaultValues(order?: Order | null): ReturnOrderFormData {
   };
 }
 
-export default function OrdersPage() {
+function Stats({ orders }: { orders: Order[] }) {
+  const stats = [
+    { label: 'Tổng đơn thuê', value: orders.length, icon: ShoppingBag },
+    {
+      label: 'Chờ thanh toán',
+      value: orders.filter((item) => item.status === OrderStatus.PENDING).length,
+      icon: Wallet,
+    },
+    {
+      label: 'Đang cho thuê',
+      value: orders.filter((item) => item.status === OrderStatus.RENTING).length,
+      icon: ShoppingBag,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      {stats.map((item, index) => (
+        <Card
+          key={item.label}
+          className={cn(
+            'rounded-[1.6rem] border-0 bg-white shadow-[0_12px_32px_rgba(120,134,164,0.12)]',
+            index === stats.length - 1 && stats.length % 2 !== 0 && 'col-span-2 lg:col-span-1',
+          )}
+        >
+          <CardContent className="flex min-h-[112px] items-center justify-between gap-4 p-5">
+            <div>
+              <p className="text-sm text-muted-foreground">{item.label}</p>
+              <p className="mt-2 text-3xl font-semibold">{item.value}</p>
+            </div>
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/70">
+              <item.icon className="size-5 text-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function CustomerOrdersView() {
+  const [selectedViewOrderId, setSelectedViewOrderId] = useState<number | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const { data, isLoading } = useMyOrders();
+  const orders = data?.data ?? [];
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground">Đang tải dữ liệu...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Stats orders={orders} />
+
+      <section className="space-y-4 rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm">
+        <div>
+          <h2 className="text-lg font-bold">Đơn của tôi</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Theo dõi các đơn đã được duyệt hoặc được tạo cho tài khoản của bạn.
+          </p>
+        </div>
+
+        {orders.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--page-divider)] p-6 text-center text-sm text-muted-foreground">
+            Bạn chưa có đơn thuê nào.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-muted/30">
+                <TableHead>Mã đơn</TableHead>
+                <TableHead>Ngày thuê</TableHead>
+                <TableHead>Ngày trả</TableHead>
+                <TableHead>Tiền thuê</TableHead>
+                <TableHead>Tiền cọc</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Thanh toán</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orders.map((order) => (
+                <TableRow key={order.id} className="hover:bg-muted/20">
+                  <TableCell className="font-medium">#{order.id}</TableCell>
+                  <TableCell>{order.rentalStartDate}</TableCell>
+                  <TableCell>{order.rentalEndDate}</TableCell>
+                  <TableCell>{formatCurrency(order.rentalPrice)}</TableCell>
+                  <TableCell>{formatCurrency(order.depositAmount)}</TableCell>
+                  <TableCell>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                      {statusLabels[order.status]}
+                    </span>
+                  </TableCell>
+                  <TableCell>{paymentLabels[order.paymentStatus]}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedViewOrderId(order.id);
+                        setDetailDialogOpen(true);
+                      }}
+                    >
+                      Xem
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </section>
+
+      <OrderDetailDialog
+        open={detailDialogOpen}
+        orderId={selectedViewOrderId}
+        onOpenChange={(nextOpen) => {
+          setDetailDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setSelectedViewOrderId(null);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+function OwnerOrdersView() {
   const [status, setStatus] = useState<string>('');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -90,11 +193,10 @@ export default function OrdersPage() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<number>(0);
   const [selectedViewOrderId, setSelectedViewOrderId] = useState<number | null>(null);
-  const debouncedSearch = useDebounce(search);
 
-  const { data, isLoading, isFetching } = useOrders({
-    status,
-    search: debouncedSearch || undefined,
+  const { data, isLoading } = useOrders({
+    status: status || undefined,
+    search: search || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
@@ -106,38 +208,8 @@ export default function OrdersPage() {
   const selectedOrder =
     orders.find((order) => order.id === selectedReturnOrderId) ?? null;
 
-  const stats = [
-    { label: 'Tổng đơn thuê', value: orders.length, icon: ShoppingBag },
-    {
-      label: 'Chờ thanh toán',
-      value: orders.filter((item) => item.status === OrderStatus.PENDING).length,
-      icon: Wallet,
-    },
-    {
-      label: 'Đang cho thuê',
-      value: orders.filter((item) => item.status === OrderStatus.RENTING).length,
-      icon: RotateCcw,
-    },
-  ];
-
-  const renderOrderActions = (order: Order, align: 'start' | 'end' = 'end') => (
-    <div
-      className={cn(
-        'flex flex-wrap gap-2',
-        align === 'end' ? 'justify-end' : 'justify-start'
-      )}
-    >
-      {order.status === OrderStatus.PENDING && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => confirmPaymentMutation.mutate(order.id)}
-          disabled={confirmPaymentMutation.isPending}
-        >
-          Xác nhận TT
-        </Button>
-      )}
-
+  const renderActions = (order: Order) => (
+    <>
       <Button
         variant="outline"
         size="sm"
@@ -149,15 +221,23 @@ export default function OrdersPage() {
         Xem
       </Button>
 
-      {order.status === OrderStatus.RENTING && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(`${API_BASE_URL}/orders/${order.id}/invoice`)}
-        >
-          <Download className="mr-1 size-4" />
-          Hóa đơn
-        </Button>
+      {order.status === OrderStatus.PENDING && (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => confirmPaymentMutation.mutate(order.id)}
+          >
+            Xác nhận thanh toán
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => cancelMutation.mutate(order.id)}
+          >
+            Hủy đơn
+          </Button>
+        </>
       )}
 
       {order.status === OrderStatus.RENTING && (
@@ -172,165 +252,56 @@ export default function OrdersPage() {
           Trả đồ
         </Button>
       )}
-
-      {order.status === OrderStatus.RETURNED && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(`${API_BASE_URL}/orders/${order.id}/invoice`)}
-        >
-          <Download className="mr-1 size-4" />
-          Hóa đơn
-        </Button>
-      )}
-
-      {order.status === OrderStatus.RETURNED && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(`${API_BASE_URL}/orders/${order.id}/receipt`)}
-        >
-          <Download className="mr-1 size-4" />
-          Biên nhận
-        </Button>
-      )}
-
-      {order.status === OrderStatus.PENDING && (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => cancelMutation.mutate(order.id)}
-          disabled={cancelMutation.isPending}
-        >
-          Hủy
-        </Button>
-      )}
-    </div>
+    </>
   );
 
-  const onReturnSubmit = (formData: ReturnOrderFormData) => {
-    if (!selectedOrder) {
-      return;
-    }
-
-    returnMutation.mutate(
-      { id: selectedOrder.id, data: formData },
-      {
-        onSuccess: () => {
-          setReturnDialogOpen(false);
-          setSelectedReturnOrderId(0);
-        },
-      }
-    );
-  };
-
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 rounded-2xl" />
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <Skeleton className="h-28 rounded-[1.9rem]" />
-          <Skeleton className="h-28 rounded-[1.9rem]" />
-          <Skeleton className="h-28 rounded-[1.9rem]" />
-        </div>
-        <Skeleton className="h-96 rounded-2xl" />
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground">Đang tải dữ liệu...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)] sm:p-6 md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col gap-4 rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">Quản lý vòng đời đơn thuê</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Đơn thuê</h1>
+          <h2 className="text-2xl font-semibold tracking-tight">Quản lý đơn thuê</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Theo dõi đơn mới, thanh toán và quy trình trả đồ theo từng sản phẩm.
+            Tạo đơn tại quầy, xác nhận thanh toán và xử lý trả đồ trong cùng một luồng.
           </p>
         </div>
-        <Button
-          onClick={() => setFormOpen(true)}
-          className="w-full rounded-full px-5 sm:w-auto"
-        >
-          <Plus className="mr-2 size-4" />
+        <Button onClick={() => setFormOpen(true)} className="rounded-full px-5">
           Tạo đơn mới
         </Button>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        {stats.map((item, index) => (
-          <Card
-            key={item.label}
-            className={cn(
-              'rounded-[1.6rem] border-0 bg-white shadow-[0_12px_32px_rgba(120,134,164,0.12)] sm:rounded-[1.9rem]',
-              index === stats.length - 1 && stats.length % 2 !== 0 && 'col-span-2 lg:col-span-1'
-            )}
-          >
-            <CardContent className="flex min-h-[96px] items-center justify-between gap-3 p-4 sm:min-h-[112px] sm:gap-4 sm:p-5">
-              <div>
-                <p className="text-xs text-muted-foreground sm:text-sm">{item.label}</p>
-                <p className="mt-2 text-2xl font-semibold sm:text-3xl">{item.value}</p>
-              </div>
-              <div className="flex size-10 items-center justify-center rounded-xl bg-muted/70 sm:size-12 sm:rounded-2xl">
-                <item.icon className="size-4 text-foreground sm:size-5" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Stats orders={orders} />
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)]">
-        <div className="space-y-3">
+      <section className="space-y-4 rounded-3xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-6 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr_1fr]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              type="text"
-              placeholder="Tìm mã đơn, tên khách, số điện thoại..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="h-11 rounded-full bg-card pl-10 pr-4"
+              placeholder="Tìm theo mã đơn, tên người thuê, số điện thoại..."
+              className="h-11 rounded-full pl-10"
             />
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-            <div className="space-y-1">
-              <Label htmlFor="dateFrom" className="text-xs text-muted-foreground">
-                Từ ngày
-              </Label>
-              <Input
-                id="dateFrom"
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="h-11 rounded-full bg-card px-4"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="dateTo" className="text-xs text-muted-foreground">
-                Đến ngày
-              </Label>
-              <Input
-                id="dateTo"
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="h-11 rounded-full bg-card px-4"
-              />
-            </div>
-
-            <div className="w-fit rounded-full bg-muted/70 px-4 py-2 text-sm text-muted-foreground lg:justify-self-end">
-              {isFetching && !isLoading ? 'Đang lọc...' : `${orders.length} đơn`}
-            </div>
-          </div>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+            className="h-11 rounded-full"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+            className="h-11 rounded-full"
+          />
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant={status === '' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatus('')}
-          >
+          <Button variant={status === '' ? 'default' : 'outline'} size="sm" onClick={() => setStatus('')}>
             Tất cả
           </Button>
           {Object.entries(statusLabels).map(([value, label]) => (
@@ -345,126 +316,62 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        {(search || dateFrom || dateTo || status) && (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <CalendarRange className="size-4" />
-            <span>
-              {dateFrom || dateTo
-                ? `Khoảng ngày: ${dateFrom || '...'} - ${dateTo || '...'}`
-                : 'Đang lọc theo trạng thái hoặc từ khóa'}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearch('');
-                setDateFrom('');
-                setDateTo('');
-                setStatus('');
-              }}
-            >
-              Xóa bộ lọc
-            </Button>
-          </div>
-        )}
-
-        <div className="space-y-3 lg:hidden">
+        <div>
           {orders.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--page-divider)] p-6 text-center text-sm text-muted-foreground">
-              Không có đơn thuê phù hợp.
+              Không có đơn nào phù hợp.
             </div>
           ) : (
-            orders.map((order) => (
-              <Card
-                key={order.id}
-                className="rounded-[1.6rem] border border-[var(--page-divider)] bg-white shadow-[0_12px_32px_rgba(120,134,164,0.08)]"
-              >
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">#{order.id}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {order.customer?.fullName || 'Không rõ khách hàng'}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 text-right">
-                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-muted/30">
+                  <TableHead>Mã đơn</TableHead>
+                  <TableHead>Người thuê</TableHead>
+                  <TableHead>Ngày thuê</TableHead>
+                  <TableHead>Ngày trả</TableHead>
+                  <TableHead>Tiền thuê</TableHead>
+                  <TableHead>Tiền cọc</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead>Thanh toán</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id} className="hover:bg-muted/20">
+                    <TableCell className="font-medium">#{order.id}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{order.renterFullName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {order.renterPhoneNumber || 'Chưa có số điện thoại'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{order.rentalStartDate}</TableCell>
+                    <TableCell>{order.rentalEndDate}</TableCell>
+                    <TableCell>{formatCurrency(order.rentalPrice)}</TableCell>
+                    <TableCell>{formatCurrency(order.depositAmount)}</TableCell>
+                    <TableCell>
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
                         {statusLabels[order.status]}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {paymentLabels[order.paymentStatus]}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-2xl bg-muted/40 px-3 py-2">
-                      <p className="text-xs text-muted-foreground">Ngày thuê</p>
-                      <p className="mt-1 font-medium">{order.rentalStartDate}</p>
-                    </div>
-                    <div className="rounded-2xl bg-muted/40 px-3 py-2">
-                      <p className="text-xs text-muted-foreground">Ngày trả</p>
-                      <p className="mt-1 font-medium">{order.rentalEndDate}</p>
-                    </div>
-                    <div className="rounded-2xl bg-muted/40 px-3 py-2">
-                      <p className="text-xs text-muted-foreground">Tiền thuê</p>
-                      <p className="mt-1 font-medium">{formatCurrency(order.rentalPrice)}</p>
-                    </div>
-                    <div className="rounded-2xl bg-muted/40 px-3 py-2">
-                      <p className="text-xs text-muted-foreground">Tiền cọc</p>
-                      <p className="mt-1 font-medium">{formatCurrency(order.depositAmount)}</p>
-                    </div>
-                  </div>
-
-                  {renderOrderActions(order, 'start')}
-                </CardContent>
-              </Card>
-            ))
+                    </TableCell>
+                    <TableCell>{paymentLabels[order.paymentStatus]}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {renderActions(order)}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </div>
+      </section>
 
-        <div className="hidden lg:block">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-muted/50">
-                <TableHead>Mã đơn</TableHead>
-                <TableHead>Khách hàng</TableHead>
-                <TableHead>Ngày thuê</TableHead>
-                <TableHead>Ngày trả</TableHead>
-                <TableHead>Tiền thuê</TableHead>
-                <TableHead>Tiền cọc</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Thanh toán</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id} className="hover:bg-muted/30">
-                  <TableCell className="font-medium">#{order.id}</TableCell>
-                  <TableCell>{order.customer?.fullName}</TableCell>
-                  <TableCell>{order.rentalStartDate}</TableCell>
-                  <TableCell>{order.rentalEndDate}</TableCell>
-                  <TableCell>{formatCurrency(order.rentalPrice)}</TableCell>
-                  <TableCell>{formatCurrency(order.depositAmount)}</TableCell>
-                  <TableCell>{statusLabels[order.status]}</TableCell>
-                  <TableCell>{paymentLabels[order.paymentStatus]}</TableCell>
-                  <TableCell className="text-right">
-                    {renderOrderActions(order)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      <OrderForm
-        key={`order-form-${formOpen ? 'open' : 'closed'}`}
-        open={formOpen}
-        onOpenChange={setFormOpen}
-      />
+      <OrderForm open={formOpen} onOpenChange={setFormOpen} />
 
       <ReturnOrderDialog
         open={returnDialogOpen}
@@ -474,7 +381,20 @@ export default function OrdersPage() {
             setSelectedReturnOrderId(0);
           }
         }}
-        onSubmit={onReturnSubmit}
+        onSubmit={(formData) => {
+          if (!selectedOrder) {
+            return;
+          }
+          returnMutation.mutate(
+            { id: selectedOrder.id, data: formData },
+            {
+              onSuccess: () => {
+                setReturnDialogOpen(false);
+                setSelectedReturnOrderId(0);
+              },
+            },
+          );
+        }}
         order={selectedOrder}
         isSubmitting={returnMutation.isPending}
       />
@@ -491,6 +411,16 @@ export default function OrdersPage() {
       />
     </div>
   );
+}
+
+export default function OrdersPage() {
+  const user = useAuthStore((state) => state.user);
+
+  if (user?.role === 'CUSTOMER') {
+    return <CustomerOrdersView />;
+  }
+
+  return <OwnerOrdersView />;
 }
 
 function ReturnOrderDialog({
@@ -513,7 +443,7 @@ function ReturnOrderDialog({
 
   useEffect(() => {
     form.reset(getReturnDefaultValues(order));
-  }, [form, order, open]);
+  }, [form, order]);
 
   const watchedItems =
     useWatch({
@@ -533,10 +463,7 @@ function ReturnOrderDialog({
     }, 0) ?? 0;
 
   const totalPenaltyAmount = standardPenaltyAmount + Number(extraPenaltyAmount || 0);
-  const refundAmount = Math.max(
-    0,
-    Number(order?.depositAmount ?? 0) - totalPenaltyAmount
-  );
+  const refundAmount = Math.max(0, Number(order?.depositAmount ?? 0) - totalPenaltyAmount);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -546,54 +473,31 @@ function ReturnOrderDialog({
         </DialogHeader>
 
         {!order ? (
-            <p className="text-sm text-muted-foreground">
-            Không tìm thấy thông tin đơn thuê.
-          </p>
+          <p className="text-sm text-muted-foreground">Không tìm thấy thông tin đơn thuê.</p>
         ) : (
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             <div className="rounded-2xl border border-border bg-muted/30 p-4">
               <div className="grid gap-3 md:grid-cols-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Đơn thuê
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Đơn thuê</p>
                   <p className="mt-1 text-sm font-medium">#{order.id}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Tiền cọc
-                  </p>
-                  <p className="mt-1 text-sm font-medium">
-                    {formatCurrency(order.depositAmount)}
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Tiền cọc</p>
+                  <p className="mt-1 text-sm font-medium">{formatCurrency(order.depositAmount)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Khách hàng
-                  </p>
-                  <p className="mt-1 text-sm font-medium">
-                    {order.customer?.fullName ?? 'Không rõ'}
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Người thuê</p>
+                  <p className="mt-1 text-sm font-medium">{order.renterFullName}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold">Kiểm tra hư hỏng theo sản phẩm</h3>
-                <p className="text-sm text-muted-foreground">
-                  Hệ thống sẽ tự tính tiền phạt từ mức phạt chuẩn của từng sản phẩm.
-                </p>
-              </div>
-
               {order.items.map((item, index) => {
-                const damagedQuantity =
-                  Number(watchedItems[index]?.damagedQuantity ?? 0);
                 const damageFee = Number(item.product?.damageFee ?? 0);
-                const linePenalty = damagedQuantity * damageFee;
-                const quantityError =
-                  form.formState.errors.itemPenalties?.[index]?.damagedQuantity
-                    ?.message;
+                const damagedQuantity = Number(watchedItems[index]?.damagedQuantity ?? 0);
+                const linePenalty = damageFee * damagedQuantity;
 
                 return (
                   <div
@@ -610,40 +514,26 @@ function ReturnOrderDialog({
                       <div className="space-y-1">
                         <p className="font-medium">{item.product?.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Đã thuê: {item.quantity} | Mức phạt chuẩn:{' '}
-                          {formatCurrency(damageFee)} / món
+                          Đã thuê: {item.quantity} · Phí hư hỏng chuẩn: {formatCurrency(damageFee)}
                         </p>
                       </div>
-
                       <div className="w-full md:w-40">
-                        <Label htmlFor={`damagedQuantity-${item.id}`}>
-                          Số lượng hư hỏng
-                        </Label>
+                        <Label htmlFor={`damaged-${item.id}`}>Số lượng hư hỏng</Label>
                         <Input
-                          id={`damagedQuantity-${item.id}`}
+                          id={`damaged-${item.id}`}
                           type="number"
                           min="0"
                           max={item.quantity}
-                          {...form.register(
-                            `itemPenalties.${index}.damagedQuantity`,
-                            {
-                              valueAsNumber: true,
-                              min: 0,
-                              max: item.quantity,
-                            }
-                          )}
+                          {...form.register(`itemPenalties.${index}.damagedQuantity`, {
+                            valueAsNumber: true,
+                          })}
                         />
                       </div>
                     </div>
-
                     <div className="mt-3 flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Tiền phạt dòng này</span>
                       <span className="font-medium">{formatCurrency(linePenalty)}</span>
                     </div>
-
-                    {quantityError && (
-                      <p className="mt-2 text-xs text-destructive">{quantityError}</p>
-                    )}
                   </div>
                 );
               })}
@@ -658,59 +548,30 @@ function ReturnOrderDialog({
                   min="0"
                   {...form.register('extraPenaltyAmount', { valueAsNumber: true })}
                 />
-                {form.formState.errors.extraPenaltyAmount && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.extraPenaltyAmount.message}
-                  </p>
-                )}
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="extraPenaltyReason">Lý do phụ phí khác</Label>
-                <Input
-                  id="extraPenaltyReason"
-                  placeholder="Ví dụ: trễ hạn, mất phụ kiện"
-                  {...form.register('extraPenaltyReason')}
-                />
-                {form.formState.errors.extraPenaltyReason && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.extraPenaltyReason.message}
-                  </p>
-                )}
+                <Label htmlFor="extraPenaltyReason">Lý do phụ phí</Label>
+                <Input id="extraPenaltyReason" {...form.register('extraPenaltyReason')} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="note">Ghi chú trả đồ</Label>
-              <Textarea
-                id="note"
-                rows={3}
-                placeholder="Mô tả tình trạng sản phẩm, cách xử lý hoặc ghi chú thêm"
-                {...form.register('note')}
-              />
+              <Textarea id="note" rows={3} {...form.register('note')} />
             </div>
 
             <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <h3 className="text-sm font-semibold">Tổng kết hoàn cọc</h3>
-              <div className="mt-3 space-y-2 text-sm">
+              <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Tiền cọc</span>
                   <span>{formatCurrency(order.depositAmount)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tiền phạt theo sản phẩm</span>
-                  <span>{formatCurrency(standardPenaltyAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Phụ phí khác</span>
-                  <span>{formatCurrency(Number(extraPenaltyAmount || 0))}</span>
-                </div>
-                <div className="flex items-center justify-between font-medium">
-                  <span>Tổng tiền phạt</span>
+                  <span className="text-muted-foreground">Tổng tiền phạt</span>
                   <span>{formatCurrency(totalPenaltyAmount)}</span>
                 </div>
-                <div className="flex items-center justify-between text-base font-semibold">
-                  <span>Số tiền hoàn cọc</span>
+                <div className="flex items-center justify-between font-semibold">
+                  <span>Số tiền hoàn</span>
                   <span>{formatCurrency(refundAmount)}</span>
                 </div>
               </div>
@@ -718,7 +579,7 @@ function ReturnOrderDialog({
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Hủy
+                Đóng
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 Xác nhận trả đồ

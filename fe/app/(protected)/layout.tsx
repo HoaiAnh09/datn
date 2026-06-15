@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Menu } from 'lucide-react';
 import { AuthGuard } from '@/common/components/auth-guard';
 import { BrandMark } from '@/common/components/brand-mark';
 import { Sidebar } from '@/common/components/sidebar';
@@ -11,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Menu } from 'lucide-react';
 
 export default function ProtectedLayout({
   children,
@@ -22,7 +22,7 @@ export default function ProtectedLayout({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen text-foreground bg-transparent flex flex-col md:flex-row">
+      <div className="flex min-h-screen flex-col bg-transparent text-foreground md:flex-row">
         <div className="sticky top-0 z-30 border-b border-[var(--page-divider)] bg-[color-mix(in_oklab,var(--page-panel)_86%,white)]/95 backdrop-blur md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
@@ -45,7 +45,7 @@ export default function ProtectedLayout({
         </div>
 
         <Sidebar className="hidden md:flex" />
-        <main className="min-w-0 flex-1 p-4 md:p-(--spacing-layout)">
+        <main className="min-w-0 flex-1 p-4 md:p-[var(--spacing-layout)]">
           {children}
         </main>
 

@@ -9,8 +9,17 @@ import { map } from 'rxjs/operators';
 
 export interface ApiResponse<T> {
   success: boolean;
-  message: string;
+  message?: string;
   data?: T;
+}
+
+function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'success' in value &&
+    ('message' in value || 'data' in value)
+  );
 }
 
 @Injectable()
@@ -22,11 +31,16 @@ export class TransformInterceptor<T>
     next: CallHandler,
   ): Observable<ApiResponse<T>> {
     return next.handle().pipe(
-      map((data) => ({
-        success: true,
-        message: 'Thao tác thành công',
-        data,
-      })),
+      map((data) => {
+        if (isApiResponse<T>(data)) {
+          return data;
+        }
+
+        return {
+          success: true,
+          data,
+        };
+      }),
     );
   }
 }

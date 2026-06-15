@@ -17,12 +17,14 @@ export function useUpdateShopSettings() {
 
   return useMutation({
     mutationFn: shopApi.updateSettings,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['shop-settings'] });
-      toast.success('Cập nhật thông tin shop thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, 'Lỗi khi cập nhật thông tin shop'));
+      toast.error(getErrorMessage(error, 'Lỗi khi cập nhật thông tin cửa hàng'));
     },
   });
 }

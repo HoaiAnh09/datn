@@ -10,6 +10,17 @@ export const authApi = {
     return response.data;
   },
 
+  register: async (data: {
+    username: string;
+    password: string;
+    fullName: string;
+    phoneNumber: string;
+    address?: string;
+  }) => {
+    const response = await api.post<ApiResponse<User>>('/auth/register', data);
+    return response.data;
+  },
+
   logout: async () => {
     const response = await api.post<ApiResponse>('/auth/logout');
     return response.data;

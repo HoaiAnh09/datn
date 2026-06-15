@@ -2,28 +2,67 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   LogOut,
   Package,
+  ReceiptText,
   Settings2,
   ShoppingCart,
   Tag,
-  Users,
 } from 'lucide-react';
+import { useAuthStore } from '@/common/stores/auth.store';
+import type { Role } from '@/common/types';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useLogout } from '@/features/auth/hooks/use-auth';
 import { useShopSettings } from '@/features/shop/hooks/use-shop';
-import { Button } from '@/components/ui/button';
 import { BrandMark } from './brand-mark';
 
-const navigation = [
-  { name: 'Tổng quan', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Khách hàng', href: '/customers', icon: Users },
-  { name: 'Sản phẩm', href: '/products', icon: Package },
-  { name: 'Danh mục', href: '/categories', icon: Tag },
-  { name: 'Đơn thuê', href: '/orders', icon: ShoppingCart },
-  { name: 'Shop', href: '/shop', icon: Settings2 },
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: Role[];
+};
+
+const navigation: NavItem[] = [
+  {
+    name: 'Tổng quan',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['OWNER', 'CUSTOMER'],
+  },
+  {
+    name: 'Yêu cầu đặt thuê',
+    href: '/requests',
+    icon: ReceiptText,
+    roles: ['OWNER', 'CUSTOMER'],
+  },
+  {
+    name: 'Đơn thuê',
+    href: '/orders',
+    icon: ShoppingCart,
+    roles: ['OWNER', 'CUSTOMER'],
+  },
+  {
+    name: 'Sản phẩm',
+    href: '/products',
+    icon: Package,
+    roles: ['OWNER'],
+  },
+  {
+    name: 'Danh mục',
+    href: '/categories',
+    icon: Tag,
+    roles: ['OWNER'],
+  },
+  {
+    name: 'Cửa hàng',
+    href: '/shop',
+    icon: Settings2,
+    roles: ['OWNER'],
+  },
 ];
 
 type SidebarProps = {
@@ -34,26 +73,35 @@ type SidebarProps = {
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const logoutMutation = useLogout();
+  const user = useAuthStore((state) => state.user);
   const { data: shopSettingsResponse } = useShopSettings();
+
   const shopName = shopSettingsResponse?.data?.shopName?.trim() || 'UniCo';
+  const items = user
+    ? navigation.filter((item) => item.roles.includes(user.role))
+    : [];
 
   return (
     <aside
       className={cn(
-        'flex w-full flex-col border-r border-[var(--page-divider)] bg-[var(--sidebar)] text-sidebar-foreground md:min-h-screen md:w-[248px] md:shrink-0 md:sticky md:top-0 md:h-screen md:self-start',
-        className
+        'flex w-full flex-col border-r border-[var(--page-divider)] bg-[var(--sidebar)] text-sidebar-foreground md:sticky md:top-0 md:h-screen md:min-h-screen md:w-[260px] md:shrink-0 md:self-start',
+        className,
       )}
     >
-      <div className="flex items-center gap-3 px-5 py-5 md:px-7">
+      <div className="flex items-center gap-3 px-5 py-5 md:px-6">
         <BrandMark className="size-10" />
-        <div>
-          <p className="text-xl font-semibold tracking-tight">{shopName}</p>
+        <div className="min-w-0">
+          <p className="truncate text-xl font-semibold tracking-tight">{shopName}</p>
+          <p className="text-sm text-muted-foreground">
+            {user?.role === 'OWNER' ? 'Bảng điều khiển quản lý' : 'Khu vực khách hàng'}
+          </p>
         </div>
       </div>
 
       <nav className="grid gap-2 px-4 pb-4 md:block md:space-y-1 md:px-5">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href;
+        {items.map((item) => {
+          const isActive =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
@@ -63,8 +111,8 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 rounded-full px-4 py-3 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]'
-                  : 'text-[color-mix(in_oklab,var(--sidebar-foreground)_72%,white)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                  ? 'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)] shadow-[inset_0_0_0_1px_rgba(20,27,35,0.04)]'
+                  : 'text-[color-mix(in_oklab,var(--sidebar-foreground)_72%,white)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]',
               )}
             >
               <item.icon className="size-4" />
@@ -78,7 +126,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <Button
           variant="outline"
           size="sm"
-          className="w-full bg-transparent text-sidebar-foreground border-[var(--sidebar-border)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+          className="w-full border-[var(--sidebar-border)] bg-transparent text-sidebar-foreground hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
           onClick={() => logoutMutation.mutate()}
           disabled={logoutMutation.isPending}
         >

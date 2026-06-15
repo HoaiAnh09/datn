@@ -228,8 +228,8 @@ export class PdfService {
             <div>${metaCode}</div>
             <div><span class="label">Thoi gian:</span> ${this.formatDateTime(new Date(order.createdAt ?? new Date()))}</div>
             <div><span class="label">Trang thai:</span> ${order.status}</div>
-            <div><span class="label">Khach hang:</span> ${order.customer?.fullName || 'Khach le'}</div>
-            <div><span class="label">SĐT:</span> ${order.customer?.phoneNumber || '---'}</div>
+            <div><span class="label">Khach hang:</span> ${order.renterFullName || 'Khach le'}</div>
+            <div><span class="label">SĐT:</span> ${order.renterPhoneNumber || '---'}</div>
           </div>
 
           <div class="rule"></div>

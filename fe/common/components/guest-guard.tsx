@@ -2,8 +2,12 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/common/stores/auth.store';
 import { LoadingScreen } from '@/common/components/loading-screen';
+import { useAuthStore } from '@/common/stores/auth.store';
+
+function getDefaultRouteForRole() {
+  return '/dashboard';
+}
 
 export function GuestGuard({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
@@ -12,9 +16,9 @@ export function GuestGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.replace('/dashboard');
+      router.replace(getDefaultRouteForRole());
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, router, user]);
 
   if (isLoading) {
     return <LoadingScreen />;

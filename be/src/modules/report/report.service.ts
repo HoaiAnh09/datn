@@ -26,7 +26,7 @@ export class ReportService {
       .createQueryBuilder('order')
       .select('SUM(order.rental_price + order.penalty_amount)', 'total')
       .where('order.status = :status', { status: OrderStatus.RETURNED })
-      .getRawOne();
+      .getRawOne<{ total: string | null }>();
 
     const pendingOrders = await this.orderRepo.count({
       where: { status: OrderStatus.PENDING },
@@ -45,7 +45,7 @@ export class ReportService {
       .groupBy("TO_CHAR(order.updated_at, 'YYYY-MM')")
       .orderBy("TO_CHAR(order.updated_at, 'YYYY-MM')", 'DESC')
       .limit(12)
-      .getRawMany();
+      .getRawMany<{ month: string; revenue: string; orderCount: string }>();
 
     const topProducts = await this.orderRepo
       .createQueryBuilder('order')
@@ -61,7 +61,11 @@ export class ReportService {
       .addGroupBy('product.name')
       .orderBy('SUM(item.quantity)', 'DESC')
       .limit(10)
-      .getRawMany();
+      .getRawMany<{
+        productId: string;
+        productName: string;
+        totalRented: string;
+      }>();
 
     const products = await this.productRepo
       .createQueryBuilder('product')
@@ -78,25 +82,24 @@ export class ReportService {
 
     const recentOrders = await this.orderRepo
       .createQueryBuilder('order')
-      .leftJoinAndSelect('order.customer', 'customer')
       .orderBy('order.created_at', 'DESC')
       .limit(5)
       .getMany();
 
     return {
       totalOrders,
-      totalRevenue: parseFloat(totalRevenue?.total || '0'),
+      totalRevenue: Number(totalRevenue?.total ?? 0),
       pendingOrders,
       rentingOrders,
       monthlyRevenue: monthlyRevenue.reverse().map((row) => ({
         month: row.month,
-        revenue: parseFloat(row.revenue),
-        orderCount: parseInt(row.orderCount, 10),
+        revenue: Number(row.revenue),
+        orderCount: Number(row.orderCount),
       })),
       topProducts: topProducts.map((row) => ({
-        productId: row.productId,
+        productId: Number(row.productId),
         productName: row.productName,
-        totalRented: parseInt(row.totalRented, 10),
+        totalRented: Number(row.totalRented),
       })),
       lowStockProducts: lowStockProducts.map((product) => ({
         id: product.id,
@@ -107,7 +110,7 @@ export class ReportService {
       })),
       recentOrders: recentOrders.map((order) => ({
         id: order.id,
-        customerName: order.customer?.fullName || `Đơn #${order.id}`,
+        renterName: order.renterFullName || `Don #${order.id}`,
         rentalStartDate: order.rentalStartDate,
         status: order.status,
       })),

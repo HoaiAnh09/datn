@@ -1,14 +1,14 @@
 import {
-  Entity,
   Column,
+  Entity,
+  Index,
+  JoinColumn,
   ManyToOne,
   OneToMany,
-  JoinColumn,
-  Index,
 } from 'typeorm';
 import { BaseEntity } from '../../database/entities/base.entity';
-import { Customer } from '../customer/customer.entity';
 import { Product } from '../product/product.entity';
+import { User } from '../user/user.entity';
 
 export enum OrderStatus {
   PENDING = 'PENDING',
@@ -23,20 +23,44 @@ export enum PaymentStatus {
   REFUNDED = 'REFUNDED',
 }
 
+export enum OrderSource {
+  OWNER_DIRECT = 'OWNER_DIRECT',
+  CUSTOMER_REQUEST = 'CUSTOMER_REQUEST',
+}
+
 @Entity('orders')
 @Index(['status'])
-@Index(['customerId'])
+@Index(['renterUserId'])
 @Index(['rentalStartDate'])
 export class Order extends BaseEntity {
-  @Column({ name: 'customer_id' })
-  customerId: number;
+  @Column({ name: 'renter_user_id', type: 'integer', nullable: true })
+  renterUserId: number | null;
 
-  @ManyToOne(() => Customer)
-  @JoinColumn({ name: 'customer_id' })
-  customer: Customer;
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'renter_user_id' })
+  renterUser: User | null;
 
   @OneToMany(() => OrderItem, (item) => item.order)
   items: OrderItem[];
+
+  @Column({ name: 'renter_full_name' })
+  renterFullName: string;
+
+  @Column({ name: 'renter_phone_number', type: 'varchar', nullable: true })
+  renterPhoneNumber: string | null;
+
+  @Column({ name: 'renter_address', type: 'text', nullable: true })
+  renterAddress: string | null;
+
+  @Column({ name: 'request_id', type: 'integer', nullable: true })
+  requestId: number | null;
+
+  @Column({
+    type: 'enum',
+    enum: OrderSource,
+    default: OrderSource.OWNER_DIRECT,
+  })
+  source: OrderSource;
 
   @Column({ name: 'rental_start_date', type: 'date' })
   rentalStartDate: string;
@@ -93,11 +117,14 @@ export class Order extends BaseEntity {
   })
   paymentStatus: PaymentStatus;
 
-  @Column({ nullable: true })
-  note: string;
+  @Column({ type: 'text', nullable: true })
+  note: string | null;
 
-  @Column({ name: 'qr_code_url', nullable: true })
-  qrCodeUrl: string;
+  @Column({ name: 'qr_code_url', type: 'varchar', nullable: true })
+  qrCodeUrl: string | null;
+
+  @Column({ name: 'pickup_deadline_at', type: 'timestamp', nullable: true })
+  pickupDeadlineAt: Date | null;
 }
 
 @Entity('order_items')
@@ -164,8 +191,20 @@ export class OrderItemResponseDto {
 
 export class OrderResponseDto {
   id: number;
-  customerId: number;
-  customer: any;
+  renterUserId: number | null;
+  renter: {
+    id: number;
+    username: string;
+    fullName: string;
+    phoneNumber: string | null;
+    address: string | null;
+    role: string;
+  } | null;
+  renterFullName: string;
+  renterPhoneNumber: string | null;
+  renterAddress: string | null;
+  requestId: number | null;
+  source: OrderSource;
   items: OrderItemResponseDto[];
   rentalStartDate: string;
   rentalEndDate: string;
@@ -175,23 +214,30 @@ export class OrderResponseDto {
   refundAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  note: string;
-  qrCodeUrl: string;
+  note: string | null;
+  qrCodeUrl: string | null;
+  pickupDeadlineAt: Date | null;
   createdAt: Date;
 
   constructor(order: Order) {
     this.id = order.id;
-    this.customerId = order.customerId;
-    this.customer = order.customer
+    this.renterUserId = order.renterUserId ?? null;
+    this.renter = order.renterUser
       ? {
-          id: order.customer.id,
-          fullName: order.customer.fullName,
-          phoneNumber: order.customer.phoneNumber,
+          id: order.renterUser.id,
+          username: order.renterUser.username,
+          fullName: order.renterUser.fullName,
+          phoneNumber: order.renterUser.phoneNumber ?? null,
+          address: order.renterUser.address ?? null,
+          role: order.renterUser.role,
         }
       : null;
-    this.items = order.items
-      ? order.items.map((item) => new OrderItemResponseDto(item))
-      : [];
+    this.renterFullName = order.renterFullName;
+    this.renterPhoneNumber = order.renterPhoneNumber ?? null;
+    this.renterAddress = order.renterAddress ?? null;
+    this.requestId = order.requestId ?? null;
+    this.source = order.source;
+    this.items = order.items?.map((item) => new OrderItemResponseDto(item)) ?? [];
     this.rentalStartDate = order.rentalStartDate;
     this.rentalEndDate = order.rentalEndDate;
     this.rentalPrice = Number(order.rentalPrice);
@@ -200,8 +246,9 @@ export class OrderResponseDto {
     this.refundAmount = Number(order.refundAmount);
     this.status = order.status;
     this.paymentStatus = order.paymentStatus;
-    this.note = order.note;
-    this.qrCodeUrl = order.qrCodeUrl;
+    this.note = order.note ?? null;
+    this.qrCodeUrl = order.qrCodeUrl ?? null;
+    this.pickupDeadlineAt = order.pickupDeadlineAt ?? null;
     this.createdAt = order.createdAt;
   }
 }

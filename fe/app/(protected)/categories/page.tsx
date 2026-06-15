@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { AuthGuard } from '@/common/components/auth-guard';
+import { useDebounce } from '@/common/hooks/use-debounce';
+import type { Category } from '@/common/types/category';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -17,9 +21,6 @@ import {
   useCategories,
   useDeleteCategory,
 } from '@/features/category/hooks/use-categories';
-import type { Category } from '@/common/types/category';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useDebounce } from '@/common/hooks/use-debounce';
 
 export default function CategoriesPage() {
   const [search, setSearch] = useState('');
@@ -46,47 +47,45 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)] md:flex-row md:items-center md:justify-between sm:p-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Quản lý danh mục sản phẩm</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Danh mục</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tạo và quản lý các danh mục phân loại sản phẩm.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setSelectedCategory(null);
-            setFormOpen(true);
-          }}
-          className="w-full rounded-full px-5 sm:w-auto"
-        >
-          <Plus className="mr-2 size-4" />
-          Thêm danh mục
-        </Button>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)]">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-sm">
-            <Input
-              type="text"
-              placeholder="Tìm kiếm danh mục..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="h-11 rounded-full bg-card pr-4 pl-4"
-            />
+    <AuthGuard allowedRoles={['OWNER']}>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)] md:flex-row md:items-center md:justify-between sm:p-6">
+          <div>
+            <p className="text-sm text-muted-foreground">Quản lý danh mục sản phẩm</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Danh mục</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tạo và quản lý các nhóm phân loại dùng cho sản phẩm và storefront.
+            </p>
           </div>
-
-          <div className="rounded-full bg-muted/70 px-4 py-2 text-sm text-muted-foreground">
-            {categories.length} kết quả
-          </div>
+          <Button
+            onClick={() => {
+              setSelectedCategory(null);
+              setFormOpen(true);
+            }}
+            className="w-full rounded-full px-5 sm:w-auto"
+          >
+            <Plus className="mr-2 size-4" />
+            Thêm danh mục
+          </Button>
         </div>
 
-        {isLoading ? (
-          <p className="text-muted-foreground">Đang tải...</p>
-        ) : (
+        <div className="flex flex-col gap-4 rounded-2xl border border-[var(--page-divider)] bg-[var(--page-panel)] p-5 shadow-[var(--page-shadow-soft)]">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative w-full md:max-w-sm">
+              <Input
+                type="text"
+                placeholder="Tìm kiếm danh mục..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-11 rounded-full bg-card px-4"
+              />
+            </div>
+
+            <div className="rounded-full bg-muted/70 px-4 py-2 text-sm text-muted-foreground">
+              {categories.length} kết quả
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-muted/50">
@@ -121,14 +120,14 @@ export default function CategoriesPage() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
 
-      <CategoryForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        category={selectedCategory}
-      />
-    </div>
+        <CategoryForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          category={selectedCategory}
+        />
+      </div>
+    </AuthGuard>
   );
 }

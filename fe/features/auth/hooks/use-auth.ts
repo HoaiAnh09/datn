@@ -1,11 +1,15 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { authApi } from '../api';
-import { useAuthStore } from '@/common/stores/auth.store';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/common/utils/error';
+import { useAuthStore } from '@/common/stores/auth.store';
+import { authApi } from '../api';
+
+function getDefaultRouteForRole() {
+  return '/dashboard';
+}
 
 export function useLogin() {
   const setUser = useAuthStore((s) => s.setUser);
@@ -19,10 +23,25 @@ export function useLogin() {
         setUser(data.data);
       }
       toast.success(data.message);
-      router.push('/dashboard');
+      router.push(getDefaultRouteForRole());
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, 'Đăng nhập thất bại'));
+    },
+  });
+}
+
+export function useRegister() {
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: authApi.register,
+    onSuccess: (data) => {
+      toast.success(data.message);
+      router.push('/login');
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Đăng ký thất bại'));
     },
   });
 }
@@ -35,7 +54,7 @@ export function useLogout() {
     mutationFn: authApi.logout,
     onSuccess: () => {
       clearAuth();
-      router.push('/login');
+      router.push('/');
     },
   });
 }

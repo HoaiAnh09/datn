@@ -6,11 +6,11 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { categoryApi } from '../api';
-import type { ApiResponse } from '@/common/types';
-import type { Category } from '@/common/types/category';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/common/utils/error';
+import type { ApiResponse } from '@/common/types';
+import type { Category } from '@/common/types/category';
+import { categoryApi } from '../api';
 
 export function useCategories(search?: string) {
   return useQuery<ApiResponse<Category[]>, Error>({
@@ -22,11 +22,14 @@ export function useCategories(search?: string) {
 
 export function useCreateCategory() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: categoryApi.create,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast.success('Tạo danh mục thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: Error) => {
       toast.error(getErrorMessage(error, 'Lỗi không xác định'));
@@ -36,12 +39,15 @@ export function useCreateCategory() {
 
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string } }) =>
       categoryApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast.success('Cập nhật danh mục thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: Error) => {
       toast.error(getErrorMessage(error, 'Lỗi không xác định'));
@@ -51,11 +57,14 @@ export function useUpdateCategory() {
 
 export function useDeleteCategory() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: categoryApi.delete,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast.success('Xóa danh mục thành công');
+      if (data.message) {
+        toast.success(data.message);
+      }
     },
     onError: (error: Error) => {
       toast.error(getErrorMessage(error, 'Lỗi không xác định'));
