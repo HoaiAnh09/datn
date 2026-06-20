@@ -23,7 +23,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { useMyOrders } from '@/features/order/hooks/use-orders';
 import { RentalRequestDetailDialog } from '@/features/rental-request/components/rental-request-detail-dialog';
 import {
   useApproveRentalRequest,
@@ -67,13 +66,14 @@ const requestStatusLabels: Record<RentalRequestStatus, string> = {
 
 function CustomerRequestsView() {
   const { data: requestsResponse } = useMyRentalRequests();
-  const { data: ordersResponse } = useMyOrders();
   const cancelMutation = useCancelRentalRequest();
   const [detailRequest, setDetailRequest] = useState<RentalRequest | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const requests = requestsResponse?.data ?? [];
-  const orders = ordersResponse?.data ?? [];
+  const requests = useMemo(
+    () => requestsResponse?.data ?? [],
+    [requestsResponse?.data],
+  );
 
   return (
     <div className="space-y-6">
@@ -180,7 +180,7 @@ function OwnerRequestsView() {
   const approveMutation = useApproveRentalRequest();
   const rejectMutation = useRejectRentalRequest();
 
-  const requests = data?.data ?? [];
+  const requests = useMemo(() => data?.data ?? [], [data?.data]);
   const submittedCount = useMemo(
     () => requests.filter((item) => item.status === RentalRequestStatus.SUBMITTED).length,
     [requests],
