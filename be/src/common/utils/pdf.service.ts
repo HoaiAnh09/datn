@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as puppeteer from 'puppeteer';
 import { ShopService } from '../../modules/shop/shop.service';
 
 @Injectable()
@@ -34,6 +33,11 @@ export class PdfService {
   }
 
   private async renderReceiptPdf(html: string) {
+    const { default: puppeteer } = (await new Function(
+      'specifier',
+      'return import(specifier)',
+    )('puppeteer')) as typeof import('puppeteer');
+
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
